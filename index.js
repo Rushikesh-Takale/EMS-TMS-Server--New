@@ -124,7 +124,62 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
 
+app.get("/attendance/late-checkins", async (req, res) => {
+  try {
+    const { from, to, name } = req.query;
+
+    const startDate = new Date(from);
+    const endDate = new Date(to);
+
+    endDate.setHours(23, 59, 59, 999);
+
+    const attendance = await Attendance.find({
+      date: {
+        $gte: startDate,
+        $lte: endDate,
+      },
+    }).populate("employee");
+
+    const filtered = attendance.filter((record) => {
+      if (!record.checkIn) return false;
+
+      const checkIn = new Date(record.checkIn);
+
+      const isLate =
+        checkIn.getHours() > 10 ||
+        (checkIn.getHours() === 10 &&
+          checkIn.getMinutes() > 0);
+
+      const employeeName =
+        record.employee?.name?.toLowerCase() || "";
+
+      const matchesName =
+        !name ||
+        employeeName.includes(name.toLowerCase());
+
+      return isLate && matchesName;
+    });
+
+    const response = filtered.map((record) => ({
+      _id: record._id,
+      name: record.employee?.name,
+      checkInTime: record.checkIn,
+      checkOutTime: record.checkOut,
+    }));
+
+    res.status(200).json(response);
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      message: "Failed to fetch late check-ins",
+    });
+  }
+});
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
