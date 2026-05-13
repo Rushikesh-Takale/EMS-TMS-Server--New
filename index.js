@@ -130,21 +130,31 @@ app.get("/", (req, res) => {
 
 app.get("/attendance/late-checkins", async (req, res) => {
   try {
-    const { from, to, name } = req.query;
+  const { from, to, name, teamLeaderId } = req.query;
 
     const startDate = new Date(from);
     const endDate = new Date(to);
 
     endDate.setHours(23, 59, 59, 999);
 
-    const attendance = await Attendance.find({
-      date: {
-        $gte: startDate,
-        $lte: endDate,
-      },
-    }).populate("employee");
+   const attendance = await Attendance.find({
+  date: {
+    $gte: startDate,
+    $lte: endDate,
+  },
+}).populate("employee");
+let filteredAttendance = attendance;
 
-    const filtered = attendance.filter((record) => {
+if (teamLeaderId) {
+  filteredAttendance = attendance.filter(
+    (record) =>
+      record.employee &&
+      record.employee.teamLeaderId?.toString() ===
+        teamLeaderId
+  );
+}
+
+  const filtered = filteredAttendance.filter((record) => {
       if (!record.checkIn) return false;
 
       const checkIn = new Date(record.checkIn);
@@ -356,9 +366,13 @@ app.post(
         bankDtls = JSON.parse(bankDetails);
       } catch {}
 
-      // Auto calculate probation end date
-      let probationMonths = 6;
+ 
+          probationMonths = parseInt(req.body.probationMonths) || 6; ////new change probation period step 1 
       let probationEndDate = null;
+      console.log("Probation Months received:", probationMonths); // ADD THIS
+console.log("DOJ received:", doj);
+console.log("Calculated probationEndDate:", probationEndDate);
+      
 
       const dojDate = new Date(doj);
       const endDate = new Date(dojDate);
@@ -397,8 +411,8 @@ app.post(
         doj,
         pfNumber,
         uanNumber,
-        probationMonths: 6, // optional, already in schema
-        probationEndDate: probationEndDate, // <-- AUTO CALCULATED
+       probationMonths: probationMonths, /////new change step 2 probation// optional, already in schema
+        probationEndDate: probationEndDate,// <-- AUTO CALCULATED
         password: "",
         // image: req.files?.image?.[0]?.filename || null,
         // panCardPdf: req.files?.panCardPdf?.[0]?.filename || null,
@@ -459,7 +473,154 @@ app.post(
     }
   },
 );
+// -----------------------prbation peroid extension-----------------------//
+////fetch employee whose probation period about end step 5
+app.get("/admin/probation-ending-soon", async (req, res) => {
+  try {
+    const today = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(today.getDate() + 7);
 
+    const employees = await User.find({
+      probationCompleted: { $ne: true },
+      probationEndDate: { $gte: today, $lte: sevenDaysLater }
+    }).select("name department designation employeeId doj probationEndDate");
+
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+/////////probation period extension step 6
+app.post("/admin/probation/extend/:employeeId", async (req, res) => {
+  try {
+const { probationEndDate, reason } = req.body;
+    const emp = await User.findById(req.params.employeeId);
+    if (!emp) return res.status(404).json({ error: "Employee not found" });
+
+    const baseDate = emp.probationExtendedDate || emp.probationEndDate;
+    const newEnd = new Date(baseDate);
+    newEnd.setMonth(newEnd.getMonth() + parseInt(additionalMonths));
+
+  emp.probationEndDate = new Date(probationEndDate);
+emp.probationStatus = "extended";
+emp.probationReason = reason;
+    await emp.save();
+
+     const formattedDate = newEnd.toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
+
+    // Notify all admins
+    const admins = await User.find({ role: "admin" });
+    for (const admin of admins) {
+      await Notification.create({
+        user: admin._id,
+        type: "Probation",
+        message: `${emp.name}'s probation period has been extended. New end date: ${formattedDate}.`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    // Notify all HRs
+    const hrs = await User.find({ role: "hr" });
+    for (const hr of hrs) {
+      await Notification.create({
+        user: hr._id,
+        type: "Probation",
+        message: `${emp.name}'s probation period has been extended. New end date: ${formattedDate}.`,
+        createdAt: new Date(),
+        triggeredByRole: "HR",
+      });
+    }
+
+    // Notify the employee
+    await Notification.create({
+      user: emp._id,
+      type: "Probation",
+      message: `Your probation period has been extended. New end date: ${formattedDate}.`,
+      createdAt: new Date(),
+      triggeredByRole: "EMPLOYEE",
+    });
+
+    //  Notify assigned manager
+    if (emp.managerId) {
+      await Notification.create({
+        user: emp.managerId,
+        type: "Probation",
+        message: `Your team member ${emp.name}'s probation period has been extended. New end date: ${formattedDate}.`,
+        createdAt: new Date(),
+        triggeredByRole: "MANAGER",
+      });
+    }
+
+    res.json({ message: "Probation extended.", newEndDate: newEnd });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/////probation period approval
+app.post("/admin/probation/approve/:employeeId", async (req, res) => {
+  try {
+    const emp = await User.findById(req.params.employeeId);
+    if (!emp) return res.status(404).json({ error: "Employee not found" });
+
+    //  Just mark as approved, don't complete yet
+    // Employee will go On Role on their probationEndDate naturally
+    emp.probationStatus = "approved";
+    await emp.save();
+
+    // Notify employee
+    await Notification.create({
+      user: emp._id,
+      type: "Probation",
+      message: `Your probation period has been approved. You will be On Role from ${new Date(emp.probationEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.`,
+      createdAt: new Date(),
+      triggeredByRole: "EMPLOYEE",
+    });
+
+    // Notify admins
+    const admins = await User.find({ role: "admin" });
+    for (const admin of admins) {
+      await Notification.create({
+        user: admin._id,
+        type: "Probation",
+        message: `${emp.name}'s probation has been approved. They will be On Role from ${new Date(emp.probationEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    // Notify HRs
+    const hrs = await User.find({ role: "hr" });
+    for (const hr of hrs) {
+      await Notification.create({
+        user: hr._id,
+        type: "Probation",
+        message: `${emp.name}'s probation has been approved. They will be On Role from ${new Date(emp.probationEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.`,
+        createdAt: new Date(),
+        triggeredByRole: "HR",
+      });
+    }
+
+    // Notify manager
+    if (emp.managerId) {
+      await Notification.create({
+        user: emp.managerId,
+        type: "Probation",
+        message: `Your team member ${emp.name}'s probation has been approved. They will be On Role from ${new Date(emp.probationEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.`,
+        createdAt: new Date(),
+        triggeredByRole: "MANAGER",
+      });
+    }
+
+    res.json({ message: "Probation approved successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 //verify email by using id
 app.get("/employee/verify/:id/:token", async (req, res) => {
   try {
