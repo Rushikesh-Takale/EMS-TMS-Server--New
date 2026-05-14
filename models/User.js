@@ -89,6 +89,9 @@ const userSchema = new mongoose.Schema(
     probationCompleted: { type: Boolean, default: false },
     probationEndDate: { type: Date, default: null },
 
+    probationStatus: { type: String, enum: ["pending", "extended", "approved"], default: "pending" },
+    probationExtensionReason: { type: String, default: null },
+
     // Leave balance tracking
     sickLeaveBalance: { type: Number, default: 0 },
     casualLeaveBalance: { type: Number, default: 0 },
