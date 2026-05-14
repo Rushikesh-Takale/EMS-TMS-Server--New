@@ -180,6 +180,7 @@ app.get("/attendance/late-checkins", async (req, res) => {
     });
   }
 });
+
 const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
