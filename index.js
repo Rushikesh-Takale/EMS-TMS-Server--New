@@ -14,6 +14,8 @@ const fs = require("fs");
 const setPasswordTemplate = require("./template/setPasswordTemplate");
 const rePasswordTemplate = require("./template/resetPasswordTemplate");
 const probationCompletedTemplate = require("./template/probationCompletedTemplate");
+const probationExtendedTemplate = require("./template/probationExtendedTemplate");
+const probationApprovedTemplate = require("./template/probationApprovedTemplate");
 const projectRoutes = require("./routes/projectRoutes");
 const Task = require("./models/TaskSchema");
 const Status = require("./models/StatusSchema");
@@ -130,21 +132,31 @@ app.get("/", (req, res) => {
 
 app.get("/attendance/late-checkins", async (req, res) => {
   try {
-    const { from, to, name } = req.query;
+  const { from, to, name, teamLeaderId } = req.query;
 
     const startDate = new Date(from);
     const endDate = new Date(to);
 
     endDate.setHours(23, 59, 59, 999);
 
-    const attendance = await Attendance.find({
-      date: {
-        $gte: startDate,
-        $lte: endDate,
-      },
-    }).populate("employee");
+   const attendance = await Attendance.find({
+  date: {
+    $gte: startDate,
+    $lte: endDate,
+  },
+}).populate("employee");
+let filteredAttendance = attendance;
 
-    const filtered = attendance.filter((record) => {
+if (teamLeaderId) {
+  filteredAttendance = attendance.filter(
+    (record) =>
+      record.employee &&
+      record.employee.teamLeaderId?.toString() ===
+        teamLeaderId
+  );
+}
+
+  const filtered = filteredAttendance.filter((record) => {
       if (!record.checkIn) return false;
 
       const checkIn = new Date(record.checkIn);
@@ -357,9 +369,13 @@ app.post(
         bankDtls = JSON.parse(bankDetails);
       } catch {}
 
-      // Auto calculate probation end date
-      let probationMonths = 6;
+ 
+          probationMonths = parseInt(req.body.probationMonths) || 6; ////new change probation period step 1 
       let probationEndDate = null;
+      console.log("Probation Months received:", probationMonths); // ADD THIS
+console.log("DOJ received:", doj);
+console.log("Calculated probationEndDate:", probationEndDate);
+      
 
       const dojDate = new Date(doj);
       const endDate = new Date(dojDate);
@@ -398,8 +414,8 @@ app.post(
         doj,
         pfNumber,
         uanNumber,
-        probationMonths: 6, // optional, already in schema
-        probationEndDate: probationEndDate, // <-- AUTO CALCULATED
+       probationMonths: probationMonths, /////new change step 2 probation// optional, already in schema
+        probationEndDate: probationEndDate,// <-- AUTO CALCULATED
         password: "",
         // image: req.files?.image?.[0]?.filename || null,
         // panCardPdf: req.files?.panCardPdf?.[0]?.filename || null,
@@ -460,6 +476,232 @@ app.post(
     }
   },
 );
+// -----------------------prbation peroid extension-----------------------//
+////fetch employee whose probation period about end step 5
+app.get("/admin/probation-ending-soon", async (req, res) => {
+  try {
+    const today = new Date();
+    const fifteenDaysLater = new Date();
+    fifteenDaysLater.setDate(today.getDate() + 15);
+
+    const employees = await User.find({
+      probationCompleted: { $ne: true },
+      probationEndDate: { $gte: today, $lte: fifteenDaysLater }
+    }).select("name department designation employeeId doj probationEndDate probationStatus");
+
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/////////probation period extension step 6
+app.post("/admin/probation/extend/:employeeId", authenticate,async (req, res) => {
+  try {
+    const { newEndDate, reason } = req.body;  
+
+    if (!newEndDate) {
+      return res.status(400).json({ error: "New end date is required" });
+    }
+    
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({ error: "Reason is required" });
+    }
+
+    const actionBy = req.user?._id?.toString();
+
+    const emp = await User.findById(req.params.employeeId);
+    if (!emp) return res.status(404).json({ error: "Employee not found" });
+
+  const parsedDate = new Date(newEndDate);  
+
+
+  emp.probationEndDate = parsedDate;
+  emp.probationExtendedDate = parsedDate;
+  emp.probationStatus = "extended";  
+  emp.probationExtensionReason = reason;  
+  await emp.save();
+
+  const formattedDate = parsedDate.toLocaleDateString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric"
+  });
+
+  //send mail 
+  try {
+    const emailHtml = await probationExtendedTemplate(emp.name, parsedDate, reason);
+    await transporter.sendMail({
+      from: `"CWS EMS" <${process.env.EMAIL_USER}>`,
+      to: emp.email,
+      subject: "Probation Period Extended",
+      html: emailHtml
+    });
+  } catch (emailErr) {
+    console.error("Email sending failed:", emailErr.message);
+  }
+
+    // Notify all admins
+    const adminRoles = ["admin", "ceo", "coo", "md", "hr"];
+    const admins = await User.find({ role: { $in: adminRoles } });
+    for (const admin of admins)  {
+      if (admin._id.toString() === actionBy) continue;
+      await Notification.create({
+        user: admin._id,
+        type: "Probation",
+        message: `${emp.name}'s probation period has been extended. New end date: ${formattedDate}.Reason: ${reason}`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    if (emp.reportingManager) {
+      await Notification.create({
+        user: emp.reportingManager,
+        type: "Probation",
+        message: `Your team member ${emp.name}'s probation period has been extended. New end date: ${formattedDate}. Reason: ${reason}`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    // Notify Team Leaders
+    const teams = await Team.find({
+      assignToProject: { $in: [emp._id] }
+    }).populate("teamLead", "_id name role");
+
+    const notifiedTLs = new Set();
+    for (const team of teams) {
+      if (team.teamLead && team.teamLead.length) {
+        for (const tl of team.teamLead) {
+          if (tl && tl.role === "Team_Leader" && !notifiedTLs.has(tl._id.toString())) {
+            notifiedTLs.add(tl._id.toString());
+            await Notification.create({
+              user: tl._id,
+              type: "Probation",
+              message: `Your team member ${emp.name}'s probation period has been extended. New end date: ${formattedDate}. Reason: ${reason}`,
+              createdAt: new Date(),
+              triggeredByRole: "ADMIN",
+            });
+          }
+        }
+      }
+    }
+    
+
+    // Notify the employee
+    await Notification.create({
+      user: emp._id,
+      type: "Probation",
+      message: `Your probation period has been extended. New end date: ${formattedDate}.Reason: ${reason}`,
+      createdAt: new Date(),
+      triggeredByRole: "ADMIN",
+    });
+
+
+
+    res.json({ message: "Probation extended.", newEndDate: parsedDate, status: "extended"  });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+
+/////probation period approval
+app.post("/admin/probation/approve/:employeeId",authenticate, async (req, res) => {
+  try {
+    const actionBy = req.user?._id?.toString();
+
+    const emp = await User.findById(req.params.employeeId);
+    if (!emp) return res.status(404).json({ error: "Employee not found" });
+
+    //  Just mark as approved, don't complete yet
+    // Employee will go On Role on their probationEndDate naturally
+    emp.probationStatus = "approved";
+    await emp.save();
+
+    const formattedEndDate = new Date(emp.probationEndDate).toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
+
+
+    //send email
+    try {
+      const emailHtml = await probationApprovedTemplate(emp.name, formattedEndDate);
+      await transporter.sendMail({
+        from: `"CWS EMS" <${process.env.EMAIL_USER}>`,
+        to: emp.email,
+        subject: "Probation Period Approved - On Role Confirmation",
+        html: emailHtml
+      });
+      console.log(`Probation approval email sent to ${emp.email}`);
+    } catch (emailErr) {
+      console.error("Email sending failed:", emailErr.message);
+    }
+
+        
+    const adminRoles = ["admin", "ceo", "coo", "md", "hr"];
+    const admins = await User.find({ role: { $in: adminRoles } });
+    for (const admin of admins) {
+      if (admin._id.toString() === actionBy) continue;
+      await Notification.create({
+        user: admin._id,
+        type: "Probation",
+        message: `${emp.name}'s probation has been approved. They will be On Role from ${formattedEndDate}.`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    //notify manager 
+    if (emp.reportingManager) {
+      await Notification.create({
+        user: emp.reportingManager,
+        type: "Probation",
+        message: `Your team member ${emp.name}'s probation has been approved. They will be On Role from ${formattedEndDate}.`,
+        createdAt: new Date(),
+        triggeredByRole: "ADMIN",
+      });
+    }
+
+    //notify tl
+    const teams = await Team.find({
+      assignToProject: { $in: [emp._id] }
+    }).populate("teamLead", "_id name role");
+
+    const notifiedTLs = new Set();
+    for (const team of teams) {
+      if (team.teamLead && team.teamLead.length) {
+        for (const tl of team.teamLead) {
+          if (tl && tl.role === "Team_Leader" && !notifiedTLs.has(tl._id.toString())) {
+            notifiedTLs.add(tl._id.toString());
+            await Notification.create({
+              user: tl._id,
+              type: "Probation",
+              message: `Your team member ${emp.name}'s probation has been approved. They will be On Role from ${formattedEndDate}.`,
+              createdAt: new Date(),
+              triggeredByRole: "ADMIN",
+            });
+          }
+        }
+      }
+    }
+   
+    await Notification.create({
+      user: emp._id,
+      type: "Probation",
+      message: `Your probation period has been approved. You will be On Role from ${formattedEndDate}.`,
+      createdAt: new Date(),
+      triggeredByRole: "ADMIN",
+    });
+
+
+
+
+    res.json({ message: "Probation approved successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 //verify email by using id
 app.get("/employee/verify/:id/:token", async (req, res) => {
