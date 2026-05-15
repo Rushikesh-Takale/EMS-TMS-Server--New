@@ -102,7 +102,7 @@ const probationApprovedTemplate = async (employeeName, endDate) => {
               color: #555;
               text-align: center;
             ">
-              Creative Web Solution • LWT, 203, C/O ITI Rd, Above PNG, Near Parihar Chowk, Aundh, Maharashtra 411007.
+            Creative Web Solution • Registered Office: LWT, 203, C/O ITI Rd, Above PNG, Near Parihar Chowk, Aundh, Maharashtra 411007.
             </footer>
           </div>
         </div>

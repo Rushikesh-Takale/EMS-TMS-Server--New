@@ -1,7 +1,6 @@
 const logoURL = "https://res.cloudinary.com/dfvumzr0q/image/upload/v1764346150/email-assets/hzcl6heksswnumx0dpvj.jpg";
- const logo2 = "https://res.cloudinary.com/dqq73hjni/image/upload/v1778844121/CWS_Logo_1_mu04x7.png"
 
-const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
+const adminProbationExtendedTemplate = async (employeeName, employeeId, department, designation, newEndDate, reason, extendedBy) => {
   const formattedDate = newEndDate ? new Date(newEndDate).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -43,22 +42,22 @@ const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
               border-bottom: 1px solid #ccc;
               padding-bottom: 15px;
             ">
-              <img 
-                src="${logo2}" 
-                alt="Logo"
-                style="
-                  height: 80px; 
-                  width: auto;
-                  object-fit: contain;
-                  display: block;
-                  margin: 0 auto;
-                "
-              />
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img 
+                  src="${logoURL}" 
+                  alt="Logo"
+                  style="
+                    height: 80px; 
+                    width: auto;
+                    object-fit: contain;
+                  "
+                />
+              </div>
             </div>
 
             <!-- Content Section -->
             <div style="text-align: left;">
-              <p>Dear ${employeeName},</p>
+              <p>Dear Admin/HR,</p>
 
               <h3 style="
                 margin-top: 0;
@@ -66,20 +65,24 @@ const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
                 font-weight: bold;
                 color: #000000;
               ">
-                Probation Period Extended
+                Probation Period Extended - Notification
               </h3>
 
               <p>
-                This is to inform you that your probation period has been extended.
+                This is to inform you that an employee's probation period has been extended.
               </p>
 
-              <p>New Probation End Date: <strong>${formattedDate}</strong></p>
+              <p><strong>Employee Details:</strong></p>
+              <ul>
+                <li><strong>Name:</strong> ${employeeName}</li>
+                <li><strong>Employee ID:</strong> ${employeeId}</li>
+                <li><strong>Department:</strong> ${department || 'N/A'}</li>
+                <li><strong>Designation:</strong> ${designation || 'N/A'}</li>
+              </ul>
 
-              <p>Reason for Extension: <strong>${reason}</strong></p>
+              <p><strong>New Probation End Date:</strong> ${formattedDate}</p>
 
-              <p>
-              If you have any questions or need any clarification, please feel free to reach out to your HR.
-              </p>
+              <p><strong>Reason:</strong> ${reason}</p>
 
               <p style="margin-top: 30px;">
                 Best Regards,<br/>
@@ -109,7 +112,7 @@ const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
               text-align: center;
             ">
             Creative Web Solution • Registered Office: LWT, 203, C/O ITI Rd, Above PNG, Near Parihar Chowk, Aundh, Maharashtra 411007.
-            </footer>
+           </footer>
           </div>
         </div>
       </body>
@@ -121,4 +124,4 @@ const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
   }
 };
 
-module.exports = probationExtendedTemplate;
+module.exports = adminProbationExtendedTemplate;
