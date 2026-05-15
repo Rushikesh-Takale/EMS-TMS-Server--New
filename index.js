@@ -16,6 +16,8 @@ const rePasswordTemplate = require("./template/resetPasswordTemplate");
 const probationCompletedTemplate = require("./template/probationCompletedTemplate");
 const probationExtendedTemplate = require("./template/probationExtendedTemplate");
 const probationApprovedTemplate = require("./template/probationApprovedTemplate");
+const adminProbationExtendedTemplate = require("./template/adminProbationExtendedTemplate");
+const adminProbationApprovedTemplate = require("./template/adminProbationApprovedTemplate");
 const projectRoutes = require("./routes/projectRoutes");
 const Task = require("./models/TaskSchema");
 const Status = require("./models/StatusSchema");
@@ -45,6 +47,7 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const Interview = require("./models/InterviewSchema");
 const resumeUpload = require("./authMiddleware/resumeUpload");
 require("./cron/interviewStatusCron");
+require("./cron/probationReminderCron")
 dotenv.config();
 
 const app = express();
@@ -628,12 +631,12 @@ console.log("Calculated probationEndDate:", probationEndDate);
 app.get("/admin/probation-ending-soon", async (req, res) => {
   try {
     const today = new Date();
-    const fifteenDaysLater = new Date();
-    fifteenDaysLater.setDate(today.getDate() + 15);
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(today.getMonth() + 1);
 
     const employees = await User.find({
       probationCompleted: { $ne: true },
-      probationEndDate: { $gte: today, $lte: fifteenDaysLater }
+      probationEndDate: { $gte: today, $lte: oneMonthLater }
     }).select("name department designation employeeId doj probationEndDate probationStatus");
 
     res.json(employees);
@@ -667,6 +670,8 @@ app.post("/admin/probation/extend/:employeeId", authenticate,async (req, res) =>
   emp.probationExtendedDate = parsedDate;
   emp.probationStatus = "extended";  
   emp.probationExtensionReason = reason;  
+  emp.probationReminderSent = false;
+  
   await emp.save();
 
   const formattedDate = parsedDate.toLocaleDateString("en-GB", {
@@ -684,6 +689,33 @@ app.post("/admin/probation/extend/:employeeId", authenticate,async (req, res) =>
     });
   } catch (emailErr) {
     console.error("Email sending failed:", emailErr.message);
+  }
+
+  try {
+    const adminRoles = ["hr","admin"];
+    const admins = await User.find({ role: { $in: adminRoles } });
+    
+    const adminEmailHtml = await adminProbationExtendedTemplate(
+      emp.name, 
+      emp.employeeId, 
+      emp.department, 
+      emp.designation, 
+      parsedDate, 
+      reason, 
+      'Admin'
+    );
+    
+    for (const admin of admins) {
+      await transporter.sendMail({
+        from: `"CWS EMS" <${process.env.EMAIL_USER}>`,
+        to: admin.email,
+        subject: `Probation Extended - ${emp.name}`,
+        html: adminEmailHtml
+      });
+    }
+    console.log(`Probation extension notification sent to ${admins.length} admins/HR`);
+  } catch (adminEmailErr) {
+    console.error("Admin email failed:", adminEmailErr.message);
   }
 
     // Notify all admins
@@ -784,6 +816,30 @@ app.post("/admin/probation/approve/:employeeId",authenticate, async (req, res) =
       console.error("Email sending failed:", emailErr.message);
     }
 
+    try {
+      const adminRoles = [ "admin","hr"];
+      const admins = await User.find({ role: { $in: adminRoles } });
+      
+      const adminEmailHtml = await adminProbationApprovedTemplate(
+        emp.name, 
+        emp.employeeId, 
+        emp.department, 
+        emp.designation, 
+        emp.probationEndDate, 
+      );
+      
+      for (const admin of admins) {
+        await transporter.sendMail({
+          from: `"CWS EMS" <${process.env.EMAIL_USER}>`,
+          to: admin.email,
+          subject: `Probation Approved - ${emp.name} is now On-Role`,
+          html: adminEmailHtml
+        });
+      }
+      console.log(`Probation approval notification sent to ${admins.length} admins/HR`);
+    } catch (adminEmailErr) {
+      console.error("Admin email failed:", adminEmailErr.message);
+    }
         
     const adminRoles = ["admin", "ceo", "coo", "md", "hr"];
     const admins = await User.find({ role: { $in: adminRoles } });
