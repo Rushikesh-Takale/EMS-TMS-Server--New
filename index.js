@@ -645,6 +645,29 @@ app.get("/admin/probation-ending-soon", async (req, res) => {
   }
 });
 
+// probation reminder 
+app.get("/admin/probation-reminder", authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== "admin" && req.user.role !== "hr") {
+      return res.status(403).json({ success: false });
+    }
+
+    const today = new Date();
+    const oneMonthLater = new Date();
+    oneMonthLater.setMonth(today.getMonth() + 1);
+
+    const employees = await User.find({
+      probationCompleted: { $ne: true },
+      probationEndDate: { $gte: today, $lte: oneMonthLater },
+      probationStatus: { $ne: "approved" }
+    }).select("name department designation employeeId doj probationEndDate probationStatus");
+
+    res.json({ success: true, employees });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /////////probation period extension step 6
 app.post("/admin/probation/extend/:employeeId", authenticate,async (req, res) => {
   try {
