@@ -49,7 +49,7 @@ async function checkProbationReminders() {
     });
 
     const adminAndHR = await User.find({
-      role: { $in: ["hr, admin"] }
+      role: { $in: ["hr", "admin"] }
     });
 
     if (adminAndHR.length === 0) {
