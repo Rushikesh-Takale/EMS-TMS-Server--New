@@ -1,5 +1,5 @@
 const logoURL = "https://res.cloudinary.com/dfvumzr0q/image/upload/v1764346150/email-assets/hzcl6heksswnumx0dpvj.jpg";
- const logo2 = "https://res.cloudinary.com/dqq73hjni/image/upload/v1778844121/CWS_Logo_1_mu04x7.png"
+//  const logo2 = "https://res.cloudinary.com/dqq73hjni/image/upload/v1778844121/CWS_Logo_1_mu04x7.png"
 
 const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
   const formattedDate = newEndDate ? new Date(newEndDate).toLocaleDateString('en-US', {
@@ -44,7 +44,7 @@ const probationExtendedTemplate = async (employeeName, newEndDate, reason) => {
               padding-bottom: 15px;
             ">
               <img 
-                src="${logo2}" 
+                src="${logoURL}" 
                 alt="Logo"
                 style="
                   height: 80px; 
