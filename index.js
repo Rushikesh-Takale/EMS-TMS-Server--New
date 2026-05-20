@@ -5090,6 +5090,43 @@ else {
     // ============================
     // :bell: NOTIFICATIONS
     // ============================
+    // await Notification.create({
+    //   user: employee._id,
+    //   type: "Leave",
+    //   message: `Your leave request (${new Date(
+    //     leave.dateFrom
+    //   ).toDateString()} - ${new Date(
+    //     leave.dateTo
+    //   ).toDateString()}) has been ${status}.`,
+    //   leaveRef: leave._id,
+    //   triggeredBy: userId,
+    //   triggeredByRole: role,
+    // });
+
+    // const admins = await User.find({
+    //   role: { $in: ["admin", "hr", "ceo"] },
+    // });
+
+    // for (let admin of admins) {
+    //   await Notification.create({
+    //     user: admin._id,
+    //     type: "Leave",
+    //     message: `${employee.name}'s leave request (${new Date(
+    //       leave.dateFrom
+    //     ).toDateString()} - ${new Date(
+    //       leave.dateTo
+    //     ).toDateString()}) has been ${status} by ${role}.`,
+    //     leaveRef: leave._id,
+    //     triggeredBy: userId,
+    //     triggeredByRole: role,
+    //   });
+    // }
+
+    let finalRole = role.toUpperCase();
+    if (role === "Team_Leader") finalRole = "Team_Leader";
+    if (role === "IT_Support") finalRole = "IT_Support";
+    
+    // 1️⃣ Notify the employee
     await Notification.create({
       user: employee._id,
       type: "Leave",
@@ -5099,28 +5136,66 @@ else {
         leave.dateTo
       ).toDateString()}) has been ${status}.`,
       leaveRef: leave._id,
-      triggeredBy: userId,
-      triggeredByRole: role,
+      triggeredByRole: finalRole,  
     });
 
+    // 2️⃣ Notify admins/HR/CEO/COO/MD
     const admins = await User.find({
-      role: { $in: ["admin", "hr", "ceo"] },
+      role: { $in: ["admin", "hr", "ceo", "coo", "md"] },
     });
 
     for (let admin of admins) {
       await Notification.create({
         user: admin._id,
         type: "Leave",
-        message: `${employee.name}'s leave request (${new Date(
-          leave.dateFrom
-        ).toDateString()} - ${new Date(
-          leave.dateTo
-        ).toDateString()}) has been ${status} by ${role}.`,
+        message: `${employee.name}'s leave request (${new Date(leave.dateFrom).toDateString()} - ${new Date(leave.dateTo).toDateString()}) has been ${status} by ${role}.`,
         leaveRef: leave._id,
-        triggeredBy: userId,
-        triggeredByRole: role,
+        triggeredByRole: finalRole,  
       });
     }
+
+    //Notify Team Leaders
+    const teams = await Team.find({
+      assignToProject: { $in: [employee._id] }
+    }).populate("teamLead", "_id name role");
+
+    const notifiedTLs = new Set();
+
+    for (const team of teams) {
+      if (team.teamLead && team.teamLead.length) {
+        for (const tl of team.teamLead) {
+          if (tl && tl.role === "Team_Leader" && 
+              tl._id.toString() !== userId && 
+              !notifiedTLs.has(tl._id.toString())) {
+            
+            notifiedTLs.add(tl._id.toString());
+            
+            await Notification.create({
+              user: tl._id,
+              type: "Leave",
+              message: `${employee.name}'s leave request (${new Date(leave.dateFrom).toDateString()} - ${new Date(leave.dateTo).toDateString()}) has been ${status} by ${role}.`,
+              leaveRef: leave._id,
+              triggeredByRole: finalRole,
+              createdAt: new Date()
+            });
+          }
+        }
+      }
+    }
+
+    // Notify Reporting Manager 
+    if (leave.reportingManager && 
+        leave.reportingManager.toString() !== userId) {
+      await Notification.create({
+        user: leave.reportingManager,
+        type: "Leave",
+        message: `${employee.name}'s leave request (${new Date(leave.dateFrom).toDateString()} - ${new Date(leave.dateTo).toDateString()}) has been ${status} by ${role}.`,
+        leaveRef: leave._id,
+        triggeredByRole: finalRole,
+        createdAt: new Date()
+      });
+    }
+
 
     // ============================
     // :white_check_mark: FINAL RESPONSE
