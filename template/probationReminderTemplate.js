@@ -1,5 +1,6 @@
 const probationReminderTemplate = async (employees) => {
-  
+  const logoURL = "https://res.cloudinary.com/dfvumzr0q/image/upload/v1764346150/email-assets/hzcl6heksswnumx0dpvj.jpg";
+
   const sortedEmployees = [...employees].sort((a, b) => new Date(a.probationEndDate) - new Date(b.probationEndDate));
 
   const employeeRows = sortedEmployees.map(emp => {
