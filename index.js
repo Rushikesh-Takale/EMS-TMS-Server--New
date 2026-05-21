@@ -11711,16 +11711,119 @@ app.get("/allEmp", async (req, res) => {
 
 // ================= HR CREATE SCHEDULE INTERVIEW (Jayashree 6th jan)=================
 
+// app.post(
+//   "/schedule-interview",
+//   resumeUpload.single("resume"), // ✅ multer middleware
+//   authenticate,
+//   async (req, res) => {
+//     console.log("FILE 👉", req.file); // 🔥 MUST PRINT
+//     if (req.user.role !== "hr") {
+//       return res.status(403).json({ message: "Forbidden: hr only" });
+//     }
+//     try {
+//       const interviewData = {
+//         candidateName: req.body.candidateName,
+//         email: req.body.email,
+//         role: req.body.role,
+//         date: req.body.date,
+//         startTime: req.body.startTime,
+//         endTime: req.body.endTime,
+//         duration: req.body.duration,
+//         interviewType: req.body.interviewType,
+//         interviewerId: new mongoose.Types.ObjectId(req.body.interviewerId),
+//         interviewerName: req.body.interviewerName,
+//         link: req.body.interviewType === "Online" ? req.body.link : "",
+//         manualStatus: null,
+//         comment: req.body.comment || "",
+//         // resumeUrl: req.file ? `/uploads/${req.file.filename}` : null,
+//         resumeUrl: req.file ? req.file.path : null,
+//       };
+//       if (interviewData.interviewType === "Online" && !interviewData.link) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Interview link is required for online interviews",
+//         });
+//       }
+//       console.log("FILE DATA:", req.file);
+
+//       // 🔐 BACKEND SAFETY VALIDATION
+//       const start = new Date(`1970-01-01T${interviewData.startTime}`);
+//       const end = new Date(`1970-01-01T${interviewData.endTime}`);
+
+//       if (end <= start) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "End time must be after start time",
+//         });
+//       }
+//       // ✅ ADD THIS LINE (VERY IMPORTANT)
+//       // interviewData.interviewer = interviewData.employeeId;
+//       const interview = new Interview(interviewData);
+//       await interview.save();
+
+//       // 🔔 CREATE NOTIFICATION (MANAGER / EMPLOYEE)
+//       await Notification.create({
+//         user: interview.interviewerId, // 👈 SAME ID
+//         type: "Interview",
+//         message: `New interview scheduled for ${interview.candidateName} on ${interview.date}`,
+//         interviewRef: interview._id,
+//         triggeredByRole: req.user.role.toUpperCase(),
+//       });
+
+//       res.status(201).json({
+//         success: true,
+//         message: "Interview scheduled successfully",
+//         interview,
+//       });
+//     } catch (err) {
+//       console.error(err);
+//       res.status(500).json({
+//         success: false,
+//         message: "Failed to schedule interview",
+//         error: err.message,
+//       });
+//     }
+//   },
+// );
+// ================= TIME FORMAT FUNCTION =================
+
+const formatTime12Hour = (time) => {
+
+  if (!time) return "";
+
+  const [hour, minute] = time.split(":");
+
+  const date = new Date();
+
+  date.setHours(hour);
+  date.setMinutes(minute);
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+};
+
+// ================= HR CREATE SCHEDULE INTERVIEW =================
+
 app.post(
   "/schedule-interview",
-  resumeUpload.single("resume"), // ✅ multer middleware
+  resumeUpload.single("resume"),
   authenticate,
   async (req, res) => {
-    console.log("FILE 👉", req.file); // 🔥 MUST PRINT
+    console.log("FILE 👉", req.file);
+
     if (req.user.role !== "hr") {
-      return res.status(403).json({ message: "Forbidden: hr only" });
+      return res.status(403).json({
+        message: "Forbidden: hr only",
+      });
     }
+
     try {
+      // ================= INTERVIEW DATA =================
+
       const interviewData = {
         candidateName: req.body.candidateName,
         email: req.body.email,
@@ -11730,25 +11833,47 @@ app.post(
         endTime: req.body.endTime,
         duration: req.body.duration,
         interviewType: req.body.interviewType,
-        interviewerId: new mongoose.Types.ObjectId(req.body.interviewerId),
+
+        interviewerId: new mongoose.Types.ObjectId(
+          req.body.interviewerId
+        ),
+
         interviewerName: req.body.interviewerName,
-        link: req.body.interviewType === "Online" ? req.body.link : "",
+
+        link:
+          req.body.interviewType === "Online"
+            ? req.body.link
+            : "",
+
         manualStatus: null,
+
         comment: req.body.comment || "",
-        // resumeUrl: req.file ? `/uploads/${req.file.filename}` : null,
+
         resumeUrl: req.file ? req.file.path : null,
       };
-      if (interviewData.interviewType === "Online" && !interviewData.link) {
+
+      // ================= VALIDATION =================
+
+      if (
+        interviewData.interviewType === "Online" &&
+        !interviewData.link
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Interview link is required for online interviews",
+          message:
+            "Interview link is required for online interviews",
         });
       }
-      console.log("FILE DATA:", req.file);
 
-      // 🔐 BACKEND SAFETY VALIDATION
-      const start = new Date(`1970-01-01T${interviewData.startTime}`);
-      const end = new Date(`1970-01-01T${interviewData.endTime}`);
+      // ================= TIME VALIDATION =================
+
+      const start = new Date(
+        `1970-01-01T${interviewData.startTime}`
+      );
+
+      const end = new Date(
+        `1970-01-01T${interviewData.endTime}`
+      );
 
       if (end <= start) {
         return res.status(400).json({
@@ -11756,34 +11881,672 @@ app.post(
           message: "End time must be after start time",
         });
       }
-      // ✅ ADD THIS LINE (VERY IMPORTANT)
-      // interviewData.interviewer = interviewData.employeeId;
+
+      // ================= SAVE INTERVIEW =================
+
       const interview = new Interview(interviewData);
+
       await interview.save();
 
-      // 🔔 CREATE NOTIFICATION (MANAGER / EMPLOYEE)
+      // ================= FIND INTERVIEWER =================
+
+      // const interviewer = await User.findById(
+      //   interview.interviewerId
+      // );
+      const interviewer = await User.findById(
+  interview.interviewerId
+);
+
+console.log("INTERVIEWER DATA 👉", interviewer);
+
+if (!interviewer || !interviewer.email) {
+  return res.status(400).json({
+    success: false,
+    message: "Interviewer email not found",
+  });
+}
+
+      // ================= CREATE NOTIFICATION =================
+
       await Notification.create({
-        user: interview.interviewerId, // 👈 SAME ID
+        user: interview.interviewerId,
+
         type: "Interview",
+
         message: `New interview scheduled for ${interview.candidateName} on ${interview.date}`,
+
         interviewRef: interview._id,
+
         triggeredByRole: req.user.role.toUpperCase(),
       });
 
+      // ================= RESUME ATTACHMENT =================
+
+      const attachments = [];
+
+      if (req.file) {
+        attachments.push({
+          filename: req.file.originalname,
+          path: req.file.path,
+        });
+      }
+
+      // ================= CANDIDATE MAIL =================
+
+      const candidateMailOptions = {
+        from: process.env.EMAIL_USER,
+
+        to: interview.email,
+
+        subject: `Interview Scheduled @Creative Web Solution - ${interview.role}`,
+
+        html: `
+        <div style="font-family: Arial, sans-serif; padding:20px;">
+
+          
+
+          <p>Dear ${interview.candidateName},</p>
+
+          <p>
+            We are pleased to inform you that your profile has been shortlisted and you have been selected for the interview process for the position of ${interview.role}.
+          </p>
+          <p>
+          Your interview details are as follows:
+          </p>
+
+          <table cellpadding="8">
+
+            <tr>
+              <td><b>Position:</b></td>
+              <td>${interview.role}</td>
+            </tr>
+
+            <tr>
+              <td><b>Date:</b></td>
+              <td>${interview.date}</td>
+            </tr>
+
+            <tr>
+              <td><b>Time:</b></td>
+              <td>
+         
+                ${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}
+              </td>
+            </tr>
+
+            <tr>
+              <td><b>Duration:</b></td>
+              <td>${interview.duration}</td>
+            </tr>
+
+            <tr>
+              <td><b>Interview Type:</b></td>
+              <td>${interview.interviewType}</td>
+            </tr>
+
+            
+
+            ${
+              interview.interviewType === "Online"
+                ? `
+            <tr>
+              <td><b>Meeting Link:</b></td>
+              <td>
+                <a href="${interview.link}">
+                  Join Interview
+                </a>
+              </td>
+            </tr>
+            `
+                : ""
+            }
+
+          </table>
+
+          <br/> 
+          <p> Your resume has been successfully shared with the interview panel for reference. </p> 
+          <p> Kindly ensure your availability at the scheduled time. We request you to join the meeting 5–10 minutes before the interview begins. </p> 
+          <p> If you have any queries or require any assistance, please feel free to contact the HR Team. </p>
+           <p> We wish you all the best for your interview and look forward to speaking with you. </p> 
+           <br/>
+
+          <p>
+            Thanks & Regards,<br/>
+            HR Executive <br/>
+            📞1234567890 <br/>
+            📧hr@creativewebsolution.in<br/>
+            🌐www.creativewebsolution.in
+           
+          </p>
+
+        </div>
+      `,
+      };
+
+      // ================= INTERVIEWER MAIL =================
+
+      const interviewerMailOptions = {
+        from: process.env.EMAIL_USER,
+
+        to: interviewer.email,
+
+        subject: `Interview Assigned @Creative Web Solution - ${interview.candidateName}`,
+
+        html: `
+        <div style="font-family: Arial, sans-serif; padding:20px;">
+
+        
+
+          <p>Dear ${interview.interviewerName},</p>
+
+          <p>
+          This is to inform you that the interview round for a  ${interview.role} position has been scheduled as per the details below: 
+          </p>
+
+          <table cellpadding="8">
+           
+
+            <tr>
+              <td><b>Candidate Name:</b></td>
+              <td>${interview.candidateName}</td>
+            </tr>
+
+            <tr>
+              <td><b>Role:</b></td>
+              <td>${interview.role}</td>
+            </tr>
+
+            <tr>
+              <td><b>Date:</b></td>
+              <td>${interview.date}</td>
+            </tr>
+
+            <tr>
+              <td><b>Time:</b></td>
+              <td>
+                ${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}
+              </td>
+            </tr>
+
+            <tr>
+              <td><b>Duration:</b></td>
+              <td>${interview.duration}</td>
+            </tr>
+
+            <tr>
+              <td><b>Interview Type:</b></td>
+              <td>${interview.interviewType}</td>
+            </tr>
+
+            ${
+              interview.interviewType === "Online"
+                ? `
+            <tr>
+              <td><b>Meeting Link:</b></td>
+              <td>
+                <a href="${interview.link}">
+                  Join Meeting
+                </a>
+              </td>
+            </tr>
+            `
+                : ""
+            }
+
+          </table>
+
+          <br/>
+
+          <p>
+            Please find the attached resume of the candidate for your review and reference. </p>
+                    <p>
+           kindly let us know if you require any additional information from our end.
+          </p>
+                    <p>
+           Thank you for your cooperation.
+          </p>
+
+          <br/>
+
+          <p>
+            Thanks & Regards,<br/>
+            HR Executive <br/>
+            📞1234567890 <br/>
+            📧hr@creativewebsolution.in<br/>
+            🌐www.creativewebsolution.in
+           
+          </p>
+
+
+        </div>
+      `,
+
+        attachments,
+      };
+
+      // ================= HR MAIL =================
+
+      const hrMailOptions = {
+        from: process.env.EMAIL_USER,
+
+        to: process.env.HR_EMAIL,
+
+        subject: `Interview Scheduled Successfully`,
+
+        html: `
+        <div style="font-family: Arial, sans-serif; padding:20px;">
+
+        
+         <p> Dear HR Team,</p>
+
+          <p>This is to confirm that the interview has been successfully scheduled. <p>
+
+          <table cellpadding="8">
+          
+            <tr>
+              <td><b>Candidate Name:</b></td>
+              <td>${interview.candidateName}</td>
+            </tr>
+
+            <tr>
+              <td><b>Role:</b></td>
+              <td>${interview.role}</td>
+            </tr>
+
+            <tr>
+              <td><b>Interviewer Name:</b></td>
+              <td>${interview.interviewerName}</td>
+            </tr>
+
+            <tr>
+              <td><b>Date:</b></td>
+              <td>${interview.date}</td>
+            </tr>
+
+            <tr>
+              <td><b>Time:</b></td>
+              <td>
+                ${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}
+              </td>
+            </tr>
+
+          </table>
+
+          <br/>
+ <p>The candidate resume and interview details have been shared successfully with the respective interviewer and candidate.</p>
+         
+ 
+            <p>
+            Thanks & Regards,<br/>
+            Creative Web Solutions
+            🌐www.creativewebsolution.in
+            </p>
+
+        </div>
+      `,
+      };
+
+      // ================= SEND MAILS =================
+
+      await transporter.sendMail(candidateMailOptions);
+
+      await transporter.sendMail(interviewerMailOptions);
+
+      await transporter.sendMail(hrMailOptions);
+
+// ================= INTERVIEW REMINDER MAIL =================
+
+// Interview Date + Time
+const interviewDateTime = new Date(
+  `${interview.date}T${interview.startTime}`
+);
+
+// Reminder Before 5 Minutes
+const reminderTime =
+  interviewDateTime.getTime() - 5 * 60 * 1000;
+
+// Current Time
+const currentTime = Date.now();
+
+// Delay
+const delay = reminderTime - currentTime;
+
+// Only Future Interviews
+if (delay > 0) {
+
+  console.log(
+    `⏰ Reminder scheduled in ${delay / 1000} seconds`
+  );
+
+  setTimeout(async () => {
+
+    try {
+
+// CANDIDATE REMINDER MAIL
+// =====================================================
+
+const candidateReminderSubject =
+  `Reminder: Upcoming Interview @ Creative Web Solutions - ${interview.role}`;
+
+const candidateReminderHTML = `
+<div style="font-family: Arial, sans-serif; padding:25px; line-height:1.7; color:#333;">
+
+
+
+  <p>
+    Hi ${interview.candidateName},
+  </p>
+
+  <p>
+    This is a friendly reminder regarding your upcoming interview for the position of
+    <b>${interview.role}</b> at Creative Web Solutions.
+  </p>
+
+  <p>
+    Please find the interview details below:
+  </p>
+
+  <table cellpadding="8" style="border-collapse: collapse;">
+
+    <tr>
+      <td><b>Interview Date</b></td>
+      <td>${interview.date}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Time</b></td>
+      <td>${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}</td>
+    </tr>
+
+    
+    <tr>
+      <td><b>Interview Type</b></td>
+      <td>${interview.interviewType}</td>
+    </tr>
+
+    ${
+      interview.interviewType === "Online"
+        ? `
+    <tr>
+      <td><b>Meeting Link</b></td>
+      <td>
+        <a
+          href="${interview.link}"
+          style="color:#0d6efd; text-decoration:none;"
+        >
+          Join Interview Meeting
+        </a>
+      </td>
+    </tr>
+    `
+        : ""
+    }
+
+  </table>
+
+  <br/>
+
+  <p>
+    Kindly ensure your availability and join the interview
+    5–10 minutes before the scheduled time.
+  </p>
+
+  <p>
+    We wish you all the best for your interview and look forward to speaking with you.
+  </p>
+
+  <br/>
+
+  <p>
+  Thanks & Regards,<br/>
+            HR Executive <br/>
+            📞1234567890 <br/>
+            📧hr@creativewebsolution.in<br/>
+            🌐www.creativewebsolution.in
+  </p>
+
+</div>
+`;
+
+
+// =====================================================
+// INTERVIEWER REMINDER MAIL
+// =====================================================
+
+const interviewerReminderSubject =
+  `Reminder: Interview Scheduled with ${interview.candidateName}`;
+
+const interviewerReminderHTML = `
+<div style="font-family: Arial, sans-serif; padding:25px; line-height:1.7; color:#333;">
+
+  
+
+  <p>
+    Hi ${interview.interviewerName},
+  </p>
+
+  <p>
+    This is a quick reminder regarding your scheduled interview with
+    <b>${interview.candidateName}</b> for the position of
+    <b>${interview.role}</b>.
+  </p>
+
+  <p>
+    Please find the interview details below:
+  </p>
+
+  <table cellpadding="8" style="border-collapse: collapse;">
+
+    <tr>
+      <td><b>Candidate Name</b></td>
+      <td>${interview.candidateName}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Date</b></td>
+      <td>${interview.date}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Time</b></td>
+      <td>${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Type</b></td>
+      <td>${interview.interviewType}</td>
+    </tr>
+
+    ${
+      interview.interviewType === "Online"
+        ? `
+    <tr>
+      <td><b>Meeting Link</b></td>
+      <td>
+        <a
+          href="${interview.link}"
+          style="color:#0d6efd; text-decoration:none;"
+        >
+          Join Interview Meeting
+        </a>
+      </td>
+    </tr>
+    `
+        : ""
+    }
+
+  </table>
+
+  <br/>
+
+  <p>
+    The candidate resume has already been shared with you for reference.
+  </p>
+
+  <p>
+    Kindly ensure your availability and be prepared for the discussion.
+  </p>
+
+  <br/>
+
+  <p>
+    Thanks & Regards,<br/>
+            HR Executive <br/>
+            📞1234567890 <br/>
+            📧hr@creativewebsolution.in<br/>
+            🌐www.creativewebsolution.in
+  </p>
+
+</div>
+`;
+
+
+// =====================================================
+// HR REMINDER MAIL
+// =====================================================
+
+const hrReminderSubject =
+  `Reminder: Upcoming Interview - ${interview.candidateName}`;
+
+const hrReminderHTML = `
+<div style="font-family: Arial, sans-serif; padding:25px; line-height:1.7; color:#333;">
+
+  
+
+  <p>
+    Dear HR Team,
+  </p>
+
+  <p>
+    This is a reminder that the following interview is scheduled to begin shortly.
+  </p>
+
+  <table cellpadding="8" style="border-collapse: collapse;">
+
+    <tr>
+      <td><b>Candidate Name</b></td>
+      <td>${interview.candidateName}</td>
+    </tr>
+
+    <tr>
+      <td><b>Role</b></td>
+      <td>${interview.role}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interviewer</b></td>
+      <td>${interview.interviewerName}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Date</b></td>
+      <td>${interview.date}</td>
+    </tr>
+
+    <tr>
+      <td><b>Interview Time</b></td>
+      <td>${formatTime12Hour(interview.startTime)} - ${formatTime12Hour(interview.endTime)}</td>
+    </tr>
+
+  </table>
+
+  <br/>
+
+  <p>
+    Reminder notifications have been successfully scheduled for both the candidate and interviewer.
+  </p>
+
+  <br/>
+
+  <p>
+Thanks & Regards,<br/>
+            HR Executive <br/>
+            📞1234567890 <br/>
+            📧hr@creativewebsolution.in<br/>
+            🌐www.creativewebsolution.in
+  </p>
+
+</div>
+`;
+
+
+// =====================================================
+// SEND REMINDER MAILS
+// =====================================================
+
+// Candidate Reminder
+if (interview.email) {
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: interview.email,
+    subject: candidateReminderSubject,
+    html: candidateReminderHTML,
+  });
+
+}
+
+// Interviewer Reminder
+if (interviewer?.email) {
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: interviewer.email,
+    subject: interviewerReminderSubject,
+    html: interviewerReminderHTML,
+    attachments,
+  });
+
+}
+
+// HR Reminder
+if (process.env.HR_EMAIL) {
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: process.env.HR_EMAIL,
+    subject: hrReminderSubject,
+    html: hrReminderHTML,
+  });
+
+}
+
+      console.log(
+        "✅ Reminder mails sent successfully"
+      );
+
+    } catch (error) {
+
+      console.log(
+        "❌ Reminder mail error:",
+        error.message
+      );
+
+    }
+
+  }, delay);
+
+}
+      // ================= SUCCESS RESPONSE =================
+
       res.status(201).json({
         success: true,
-        message: "Interview scheduled successfully",
+        message:
+          "Interview scheduled and emails sent successfully",
         interview,
       });
+
     } catch (err) {
-      console.error(err);
+
+      console.error("INTERVIEW ERROR:", err);
+
       res.status(500).json({
         success: false,
         message: "Failed to schedule interview",
         error: err.message,
       });
     }
-  },
+  }
 );
 
 // ================= GET ALL INTERVIEWS =================
