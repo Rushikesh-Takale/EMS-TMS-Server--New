@@ -20,6 +20,12 @@ const attendanceSchema = new mongoose.Schema(
         default: null,
       },
       reason: { type: String },
+
+        actionReason: {
+    type: String,
+    trim: true,
+    maxlength: 200,
+  },
        workMode: String,
       requestedAt: { type: Date },
       reviewedAt: { type: Date },

@@ -24,8 +24,15 @@ const leaveSchema = new mongoose.Schema({
   totalDays: { type: Number, default: 0 },
   paidDays: { type: Number, default: 0 },
   lwpDays: { type: Number, default: 0 },
-  groupId: { type: String, default: null },
-    isMerged: {type: Boolean,default: false}  
+groupId: { type: String, default: null },
+
+actionReason: {
+  type: String,
+  trim: true,
+  maxlength: 200,
+},
+
+isMerged: {type: Boolean,default: false}
 });
 
 module.exports = mongoose.model("Leave", leaveSchema);

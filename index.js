@@ -4614,14 +4614,28 @@ app.put("/leave/:leaveId/status", async (req, res) => {
       date: h.date
     }));
 
-    const { status, userId, role } = req.body;
+    const { status, userId, role, actionReason } = req.body;
     const leaveId = req.params.leaveId;
 
     if (!["approved", "rejected"].includes(status)) {
+      
       return res.status(400).json({ error: "Invalid status" });
     }
+if (
+  (status === "approved" || status === "rejected") &&
+  !actionReason?.trim()
+) {
+  return res.status(400).json({
+    error: "Reason is required",
+  });
+}
 
-    if (!userId || !["manager", "admin"].includes(role)) {
+if (actionReason && actionReason.trim().length > 200) {
+  return res.status(400).json({
+    error: "Reason cannot exceed 200 characters",
+  });
+}
+    if (!userId || !["manager", "admin","Team_Leader"].includes(role)) {
       return res.status(400).json({ error: "Invalid userId or role" });
     }
 
@@ -4814,6 +4828,8 @@ if (leave.status === "approved" && status === "rejected") {
 
 leave.status = status;
 
+leave.actionReason = actionReason?.trim();
+
 leave.approvedBy = userId;
 
 leave.approvedByRole = role;
@@ -4894,6 +4910,7 @@ if (
   // =====================================
 
   leave.status = status;
+  leave.actionReason = actionReason?.trim();
   leave.approvedBy = userId;
   leave.approvedByRole = role;
 
@@ -4932,6 +4949,7 @@ if (
   refreshedLeave.lwpDays = 0;
 
   await refreshedLeave.save();
+  refreshedLeave.actionReason = actionReason?.trim();
 
   // :fire: IMPORTANT
   await recalculateEmployeeLeaveBalances(
@@ -5045,6 +5063,7 @@ else {
   }
 
   await refreshedLeave.save();
+  refreshedLeave.actionReason = actionReason?.trim();
 
   // =====================================
   // :fire: STEP 10: RECALCULATE BALANCE
@@ -5076,6 +5095,7 @@ else {
 else {
 
   leave.status = status;
+  leave.actionReason = actionReason?.trim();
   leave.approvedBy = userId;
   leave.approvedByRole = role;
 
@@ -5685,13 +5705,30 @@ app.put(
   authenticate,
   async (req, res) => {
     try {
-      const { status } = req.body; // "Approved" or "Rejected"
+     const { status, actionReason } = req.body; // "Approved" or "Rejected"
       const { id } = req.params;
 
       if (!["Approved", "Rejected"].includes(status)) {
         return res.status(400).json({ message: "Invalid status value" });
       }
+if (
+  (status === "Approved" ||
+    status === "Rejected") &&
+  !actionReason?.trim()
+) {
+  return res.status(400).json({
+    error: "Reason is required",
+  });
+}
 
+if (
+  actionReason &&
+  actionReason.trim().length > 200
+) {
+  return res.status(400).json({
+    error: "Reason cannot exceed 200 characters",
+  });
+}
       const record = await Attendance.findById(id).populate("employee", "name role"); //rutuja 07-04-26
 
       if (!record) {
@@ -5713,6 +5750,8 @@ app.put(
         : req.user.role.toLowerCase();
 
       record.regularizationRequest.status = status;
+      record.regularizationRequest.actionReason =
+  actionReason?.trim();
     record.regularizationRequest.reviewedAt = new Date();
     record.regularizationRequest.approvedBy = req.user._id;
     record.regularizationRequest.approvedByRole = approvedRole;
