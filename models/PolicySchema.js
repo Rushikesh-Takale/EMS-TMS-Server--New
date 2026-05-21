@@ -12,7 +12,7 @@ const policySchema = new mongoose.Schema(
     description: {
       type: String,
       required: true,
-      maxlength: 200,
+      maxlength: 500,
     },
 
     image: {
