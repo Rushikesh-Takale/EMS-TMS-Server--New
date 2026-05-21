@@ -52,6 +52,11 @@ const taskSchema = new mongoose.Schema(
       ref: "Status",
       required: true,
     },
+    completedAt: {
+      type: Date,
+      default: null
+    },
+    
     priority: {
       type: String,
       enum: ["P1", "P2", "P3", "P4"],

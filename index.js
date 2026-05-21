@@ -7731,10 +7731,21 @@ app.get("/tasks/:teamLeadId", async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
+      const tasksWithDelay = tasks.map(task => {
+        const taskObj = task.toObject();
+        const delayDays = calculateDelayDays(task);
+        
+        return {
+          ...taskObj,
+          delayedBy: delayDays === null ? null : delayDays,
+          isDelayed: delayDays > 0
+        };
+      });
+
     return res.status(200).json({
       success: true,
-      count: tasks.length,
-      tasks: tasks,
+      count: tasksWithDelay.length,
+      tasks: tasksWithDelay,
     });
   } catch (error) {
     return res.status(500).json({
@@ -8465,6 +8476,37 @@ app.get("/managers/list", async (req, res) => {
   }
 });
 
+
+const calculateDelayDays = (task) => {
+  if (!task?.dateOfExpectedCompletion) return null;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const dueDate = new Date(task.dateOfExpectedCompletion);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  const statusName = task.status?.name || task.status;
+    if (statusName === "Completed") {
+    if (!task.completedAt) return null;
+    
+    const completedDate = new Date(task.completedAt);
+    completedDate.setHours(0, 0, 0, 0);
+    
+    if (completedDate > dueDate) {
+      return Math.ceil((completedDate - dueDate) / (1000 * 60 * 60 * 24));
+    }
+    return 0;
+  }
+  
+  if ((statusName === "In Progress" || statusName === "Assigned") && dueDate < today) {
+    return Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+  }
+  //hold and cancel
+  return 0;
+};
+
+
 app.get("/tasks/assigned/:employeeId", async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -8485,16 +8527,28 @@ app.get("/tasks/assigned/:employeeId", async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
+      const tasksWithDelay = tasks.map(task => {
+        const taskObj = task.toObject();
+        const delayDays = calculateDelayDays(task);
+        
+        return {
+          ...taskObj,
+          delayedBy: delayDays === null ? null : delayDays,
+          isDelayed: delayDays > 0
+        };
+      });
+
     return res.status(200).json({
       message: "Assigned tasks fetched successfully",
-      count: tasks.length,
-      tasks,
+      count: tasksWithDelay.length,
+      tasks: tasksWithDelay,
     });
   } catch (error) {
     console.error("FETCH ASSIGNED TASK ERROR:", error);
     return res.status(500).json({ message: "Server error" });
   }
 });
+
 
 //update task status employee
 app.put("/task/:taskId/status", async (req, res) => {
@@ -8518,6 +8572,17 @@ app.put("/task/:taskId/status", async (req, res) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+
+    const statusDoc = await Status.findById(status);
+    const isCompleted = statusDoc && statusDoc.name === "Completed";
+
+    const updateData = { status };
+    if (isCompleted) {
+      updateData.completedAt = new Date();
+    } else {
+      updateData.completedAt = null;
+    }
+
 
     const updatedTask = await Task.findByIdAndUpdate(
       taskId,
@@ -8560,12 +8625,14 @@ app.put("/task/:taskId/status", async (req, res) => {
     res.status(200).json({
       message: "Task status updated successfully",
       task: updatedTask,
+      completedAt: updatedTask.completedAt,
     });
   } catch (error) {
     console.error("UPDATE TASK STATUS ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 });
+
 app.get("/employees/manager/:managerId/team-status", async (req, res) => {
   try {
     const { managerId } = req.params;
