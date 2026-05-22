@@ -1140,6 +1140,7 @@ app.post("/login", async (req, res) => {
       refreshToken,
       role: user.role,
       role: user.role,
+        employeeId: user.employeeId, // ✅ ADD THIS
       username: user.name, // 👈 send username
       userId: user._id,
     });
@@ -1150,6 +1151,141 @@ app.post("/login", async (req, res) => {
       .json({ success: false, error: "Server error: " + err.message });
   }
 });
+// const LoginLocation = require("./models/LoginLocation");
+
+// app.post("/save-login-location", async (req, res) => {
+//   try {
+
+//     const newLocation = new LoginLocation(req.body);
+
+//     await newLocation.save();
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Login location saved succesfully",
+//     });
+
+//   } catch (err) {
+
+//     console.error(err);
+
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to save login location",
+//     });
+//   }
+// });
+// app.get("/save-login-location", async (req, res) => {
+
+//   try {
+
+//     const loginData = await LoginLocation.find()
+//       .sort({ loginTime: -1 });
+
+//     res.status(200).json(loginData);
+
+//   } catch (err) {
+
+//     console.error(err);
+
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch login history",
+//     });
+//   }
+// });
+
+const LoginLocation = require("./models/LoginLocation");
+
+
+app.post("/save-login-location", async (req, res) => {
+
+  try {
+
+    console.log("REQ BODY =>", req.body);
+
+    const {
+      employeeId,
+      employeeName,
+      latitude,
+      longitude,
+      address,
+    } = req.body;
+
+    // Validation
+    // if (
+    //   !employeeId ||
+    //   !employeeName ||
+    //   !latitude ||
+    //   !longitude ||
+    //   !address
+    // ) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "All fields are required",
+    //   });
+    // }
+
+    const newLocation = new LoginLocation({
+      employeeId,
+      employeeName,
+      latitude,
+      longitude,
+      address,
+      loginTime: new Date(),
+    });
+
+    await newLocation.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Login location saved successfully",
+      data: newLocation,
+    });
+
+  } catch (err) {
+
+    console.error(
+      "Save Login Location Error:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+});
+
+/* =========================
+   GET LOGIN HISTORY API
+========================= */
+
+app.get("/save-login-location", async (req, res) => {
+
+  try {
+
+    const loginData = await LoginLocation.find()
+      .sort({ loginTime: -1 });
+
+    res.status(200).json(loginData);
+
+  } catch (err) {
+
+    console.error(
+      "Fetch Login History Error:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch login history",
+    });
+
+  }
+});
+
 
 app.get("/me", authenticate, async (req, res) => {
   try {
