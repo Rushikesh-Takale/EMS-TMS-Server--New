@@ -20,6 +20,8 @@ const probationExtendedTemplate = require("./template/probationExtendedTemplate"
 const probationApprovedTemplate = require("./template/probationApprovedTemplate");
 const adminProbationExtendedTemplate = require("./template/adminProbationExtendedTemplate");
 const adminProbationApprovedTemplate = require("./template/adminProbationApprovedTemplate");
+const regularizationApplicationTemplate = require("./template/regularizationApplicationTemplate");
+const regularizationStatusUpdateTemplate = require("./template/regularizationStatusUpdateTemplate");
 const projectRoutes = require("./routes/projectRoutes");
 const Task = require("./models/TaskSchema");
 const Status = require("./models/StatusSchema");
@@ -5362,8 +5364,9 @@ else {
     // }
 
     // ========== SEND EMAIL TO EMPLOYEE ==========
-    const approver = await User.findById(userId).select("role");
+    const approver = await User.findById(userId).select("role name");
 const actualRole = approver ? approver.role : role;
+const approverName = approver ? approver.name : userId;
 
 try {
   const statusEmailHtml = await leaveStatusUpdateTemplate(
@@ -5376,7 +5379,8 @@ try {
         ? "Leave approved"
         : "Leave rejected"
     ),
-    actualRole  
+    actualRole,
+    approverName 
   );
 
   await transporter.sendMail({
@@ -5642,6 +5646,80 @@ app.post("/attendance/regularization/apply", async (req, res) => {
       },
       { new: true, upsert: true },
     );
+
+    // send email templete
+    try {
+      const regularizationHtml = await regularizationApplicationTemplate(
+        employee.name,
+        employee.employeeId,
+        employee.designation || 'N/A',
+        employee.department || 'N/A',
+        date,
+        requestedCheckIn,
+        requestedCheckOut,
+        mode,
+        reason,
+        employee.email,
+      );
+    
+      let reportingManagerEmail = null;
+      if (managerId) {
+        const manager = await User.findById(managerId).select("email");
+        if (manager && manager.email) {
+          reportingManagerEmail = manager.email;
+        }
+      }
+    
+      const ccRoles = ["admin", "hr", "ceo", "md", "coo"];
+      const ccUsers = await User.find({ 
+        role: { $in: ccRoles },
+        isDeleted: { $ne: true },
+        email: { $exists: true, $ne: null }
+      }).select("email");
+    
+      const ccEmails = ccUsers.map(u => u.email);
+    
+      const teams = await Team.find({
+        assignToProject: { $in: [employeeId] }
+      }).populate("teamLead", "email role");
+    
+      const tlEmails = new Set();
+      teams.forEach(team => {
+        if (team.teamLead && team.teamLead.length) {
+          team.teamLead.forEach(tl => {
+            if (tl && tl.role === "Team_Leader" && tl.email) {
+              tlEmails.add(tl.email);
+            }
+          });
+        }
+      });
+    
+      const allCcEmails = [...ccEmails, ...tlEmails];
+    
+      if (reportingManagerEmail) {
+        await transporter.sendMail({
+          from: `"${employee.name}" <${employee.email}>`,
+          to: reportingManagerEmail,
+          cc: allCcEmails.join(','),
+          subject: `Attendance Regularization Request - ${employee.name} (${employee.employeeId})`,
+          html: regularizationHtml,
+        });
+        console.log(`Regularization email sent to Manager: ${reportingManagerEmail}, CC: ${allCcEmails.length} recipients`);
+      } else if (allCcEmails.length > 0) {
+        await transporter.sendMail({
+          from: `"${employee.name}" <${employee.email}>`,
+          to: allCcEmails[0],
+          cc: allCcEmails.slice(1).join(','),
+          subject: `Attendance Regularization Request - ${employee.name} (${employee.employeeId})`,
+          html: regularizationHtml,
+        });
+        console.log(`Regularization email sent , CC: ${allCcEmails.length} recipients`);
+      }
+    } catch (emailErr) {
+      console.error("Email sending failed for regularization:", emailErr.message);
+    }
+    
+    // send email templete code end 
 
     const teams = await Team.find({
       assignToProject: { $in: [employeeId] }
@@ -5980,7 +6058,7 @@ if (
     error: "Reason cannot exceed 200 characters",
   });
 }
-      const record = await Attendance.findById(id).populate("employee", "name role"); //rutuja 07-04-26
+      const record = await Attendance.findById(id).populate("employee", "name role email"); //rutuja 07-04-26
 
       if (!record) {
         return res.status(404).json({ message: "Attendance record not found" });
@@ -6028,6 +6106,31 @@ if (
       }
 
       await record.save();
+
+      //email code start
+      try {
+        const statusEmailHtml = await regularizationStatusUpdateTemplate(
+          record.employee.name,
+          record.date,
+          record.regularizationRequest.checkIn,
+          record.regularizationRequest.checkOut,
+          status,
+          actionReason || (status === "Approved" ? "Regularization approved" : "Regularization rejected"),
+          approvedRole,
+          approver.name
+        );
+  
+        await transporter.sendMail({
+          from: `"CWS EMS" <${process.env.EMAIL_USER}>`,
+          to: record.employee.email,
+          subject: `Regularization Request ${status === "Approved" ? "Approved" : "Rejected"} - ${new Date(record.date).toDateString()}`,
+          html: statusEmailHtml,
+        });
+        console.log(`Regularization status email sent to ${record.employee.email}`);
+      } catch (emailErr) {
+        console.error("Regularization status update email failed:", emailErr.message);
+      }
+      // email code end
 
       //rutuja 07-04-26
       const finalRole = req.user.role === "Team_Leader" ? "Team_Leader" : req.user.role.toUpperCase();

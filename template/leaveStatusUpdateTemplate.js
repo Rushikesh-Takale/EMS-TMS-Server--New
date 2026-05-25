@@ -1,6 +1,6 @@
 const logoURL = "https://res.cloudinary.com/dfvumzr0q/image/upload/v1764346150/email-assets/hzcl6heksswnumx0dpvj.jpg";
 
-const leaveStatusUpdateTemplate = (employeeName, dateFrom, dateTo, status, actionReason, approverRole) => {
+const leaveStatusUpdateTemplate = (employeeName, dateFrom, dateTo, status, actionReason, approverRole, approverName) => {
   
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -23,9 +23,14 @@ const leaveStatusUpdateTemplate = (employeeName, dateFrom, dateTo, status, actio
     return `from ${formatDate(dateFrom)} to ${formatDate(dateTo)}`;
   };
 
-  const getStatusText = () => {
-    if (status === "approved") return "approved";
-    return "rejected";
+  const getActionLabel = () => {
+    if (status === "approved") return "Approval Reason";
+    return "Rejection Reason";
+  };
+
+  const getReviewerLabel = () => {
+    if (status === "approved") return "Approved By";
+    return "Rejected By";
   };
 
   return `
@@ -35,24 +40,22 @@ const leaveStatusUpdateTemplate = (employeeName, dateFrom, dateTo, status, actio
 
       <p>${getGreeting()},</p>
 
-      <p>Your leave request ${getDateText()} has been ${getStatusText()}.</p>
+      <p>Your leave request ${getDateText()} has been <strong>${status === "approved" ? "Approved" : "Rejected"}</strong>.</p>
 
-      <p>Status: ${status}</p>
+      <p><strong>Status:</strong> ${status === "approved" ? "Approved" : "Rejected"}</p>
 
-      <p>Remarks: ${actionReason}</p>
+      <p><strong>${getActionLabel()}:</strong> ${actionReason}</p>
 
-      <p>Reviewed By: ${approverRole}</p>
+      <p><strong>${getReviewerLabel()}:</strong> ${approverName} (${approverRole})</p>
 
       <p>Please ensure that all pending work is handed over properly before your leave period.</p>
 
       <p>
         Thanks & Regards,<br/>
-        <strong>CWS EMS Team</strong>
-      </p>
+        <strong>CWS EMS Team</strong><br/>
+        <img src="${logoURL}" alt="Logo" style="height: 50px; margin-top: 10px;">
 
-      <div style="margin-top: 10px;">
-        <img src="${logoURL}" alt="Logo" style="height: 50px;">
-      </div>
+      </p>
     </div>
   `;
 };
