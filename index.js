@@ -2115,7 +2115,125 @@ function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
 // });
 
 //above code is only for wfo and below is is form wfo and wfh
+app.get("/attendance/on-leave-employees", authenticate, async (req, res) => {
+  try {
 
+    const allowedRoles = [
+      "admin",
+      "hr",
+      "manager",
+      "Team_Leader"
+    ];
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access Denied",
+      });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+   let filter = {
+  status: "approved",
+};
+
+if (req.query.date) {
+
+  const selectedDate = new Date(
+    req.query.date
+  );
+
+  selectedDate.setHours(0, 0, 0, 0);
+
+  const nextDay = new Date(selectedDate);
+
+  nextDay.setDate(
+    nextDay.getDate() + 1
+  );
+
+  filter.dateFrom = {
+    $lt: nextDay,
+  };
+
+  filter.dateTo = {
+    $gte: selectedDate,
+  };
+
+} else {
+
+  // today's leave default
+  filter.dateFrom = { $lt: tomorrow };
+
+  filter.dateTo = { $gte: today };
+}
+
+    // Manager Filter
+    if (req.user.role === "manager") {
+      filter.reportingManager = req.user._id;
+    }
+
+    // TL Filter
+    if (req.user.role === "Team_Leader") {
+
+      const teams = await Team.find({
+        teamLead: {
+          $in: [req.user._id],
+        },
+      });
+
+      const teamEmployeeIds = teams.flatMap(
+        (team) => [
+          ...(team.members || []),
+          ...(team.assignToProject || []),
+        ]
+      );
+
+      const leaveEmployees = await Leave.find({
+        ...filter,
+        employee: { $in: teamEmployeeIds },
+      })
+      .populate(
+        "employee",
+        "name employeeId designation department"
+      )
+      .sort({ appliedAt: -1 });
+
+      return res.status(200).json({
+        success: true,
+        count: leaveEmployees.length,
+        employees: leaveEmployees,
+      });
+    }
+
+    // Admin / HR / Manager
+    const leaveEmployees = await Leave.find(filter)
+      .populate(
+        "employee",
+        "name employeeId designation department"
+      )
+      .sort({ appliedAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: leaveEmployees.length,
+      employees: leaveEmployees,
+    });
+
+  } catch (error) {
+
+    console.error("On Leave Employees Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+});
 app.post("/attendance/:id/checkin", authenticate, async (req, res) => {
   try {
     const { id } = req.params;
