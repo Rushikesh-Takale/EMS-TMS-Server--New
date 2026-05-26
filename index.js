@@ -2627,7 +2627,7 @@ app.get("/leave/balance", async (req, res) => {
 app.get("/leave/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      "name sickLeaveBalance casualLeaveBalance",
+      "name sickLeaveBalance casualLeaveBalance LwpLeave",
     );
     if (!user) return res.status(404).json({ message: "Employee not found" });
     res.json(user);
@@ -4848,11 +4848,13 @@ async function recalculateEmployeeLeaveBalances(employeeId) {
   // :white_check_mark: ORIGINAL YEARLY ALLOCATION
   // =====================================
 
-  const TOTAL_SL =
-    employee.totalSickLeave || 0;
+  // const TOTAL_SL =
+  //   employee.totalSickLeave || 0;
 
-  const TOTAL_CL =
-    employee.totalCasualLeave || 0;
+  // const TOTAL_CL =
+  //   employee.totalCasualLeave || 0;
+  const TOTAL_SL = 4; 
+const TOTAL_CL = 17; 
 
   // =====================================
   // :white_check_mark: ONLY MAIN APPROVED LEAVES
@@ -4881,7 +4883,7 @@ async function recalculateEmployeeLeaveBalances(employeeId) {
 
     if (leave.leaveType === "SL") {
 
-      usedSL += leave.paidDays || 0;
+      usedSL += leave.totalDays || 0;
 
       usedLWP += leave.lwpDays || 0;
     }
@@ -4892,7 +4894,7 @@ async function recalculateEmployeeLeaveBalances(employeeId) {
 
     else if (leave.leaveType === "CL") {
 
-      usedCL += leave.paidDays || 0;
+      usedCL += leave.totalDays  || 0;
 
       usedLWP += leave.lwpDays || 0;
     }
@@ -5338,20 +5340,14 @@ else {
   // =====================================
 
   if (refreshedLeave.leaveType === "SL") {
-
-    const available =
-      refreshedEmployee.sickLeaveBalance;
-
+    const available = refreshedEmployee.sickLeaveBalance;
     if (available >= totalLeaveDays) {
-
       paidDays = totalLeaveDays;
-
+      refreshedEmployee.sickLeaveBalance -= totalLeaveDays;
     } else {
-
       paidDays = available;
-
-      lwpDays =
-        totalLeaveDays - available;
+      lwpDays = totalLeaveDays - available;
+      refreshedEmployee.sickLeaveBalance = 0;
     }
   }
 
@@ -5360,20 +5356,14 @@ else {
   // =====================================
 
   else if (refreshedLeave.leaveType === "CL") {
-
-    const available =
-      refreshedEmployee.casualLeaveBalance;
-
+    const available = refreshedEmployee.casualLeaveBalance;
     if (available >= totalLeaveDays) {
-
       paidDays = totalLeaveDays;
-
+      refreshedEmployee.casualLeaveBalance -= totalLeaveDays;
     } else {
-
       paidDays = available;
-
-      lwpDays =
-        totalLeaveDays - available;
+      lwpDays = totalLeaveDays - available;
+      refreshedEmployee.casualLeaveBalance = 0;
     }
   }
 
@@ -5402,6 +5392,7 @@ else {
   }
 
   await refreshedLeave.save();
+  await refreshedEmployee.save();   
   refreshedLeave.actionReason = actionReason?.trim();
 
   // =====================================
