@@ -234,6 +234,118 @@ managerId
   }
 });
 
+// app.get("/attendance/late-checkins", async (req, res) => {
+//   try {
+
+//     const { from, to, name, teamLeaderId } = req.query;
+
+//     const query = {};
+
+//     // Date Filter
+// if (from || to) {
+
+//   query.checkIn = {};
+
+//   if (from) {
+
+//     const startDate = new Date(from);
+
+//     startDate.setHours(0, 0, 0, 0);
+
+//     query.checkIn.$gte = startDate;
+//   }
+
+//   if (to) {
+
+//     const endDate = new Date(to);
+
+//     endDate.setHours(23, 59, 59, 999);
+
+//     query.checkIn.$lte = endDate;
+//   }
+// }
+
+//     const attendance = await Attendance.find(query)
+//       .populate("employee");
+
+//     let filteredAttendance = attendance;
+
+//     // Team Leader Filter
+// if (teamLeaderId) {
+
+// const teams = await Team.find({
+//   teamLead: {
+//     $in: [teamLeaderId],
+//   },
+// });
+
+// const teamEmployeeIds = teams.flatMap(
+//   (team) => [
+//     ...(team.members || []),
+//     ...(team.assignToProject || []),
+//   ]
+// );
+
+//   filteredAttendance = filteredAttendance.filter(
+//     (record) =>
+//       record.employee &&
+//       teamEmployeeIds.some(
+//         (empId) =>
+//           empId.toString() ===
+//           record.employee._id.toString()
+//       )
+//   );
+// }
+
+//     // Late Check-In + Name Filter
+//     const filtered = filteredAttendance.filter((record) => {
+
+//       if (!record.checkIn) return false;
+
+//       const checkIn = new Date(record.checkIn);
+
+//       const isLate =
+//     checkIn.getHours() > 9 ||
+// (
+//   checkIn.getHours() === 9 &&
+//   checkIn.getMinutes() > 10
+// )
+
+//       const employeeName =
+//         record.employee?.name?.toLowerCase() || "";
+
+//       const matchesName =
+//         !name ||
+//         employeeName.includes(name.toLowerCase());
+
+//       return isLate && matchesName;
+//     });
+
+//     // Response
+//     const response = filtered.map((record) => ({
+//       _id: record._id,
+//       name: record.employee?.name || "-",
+//       employeeId:
+//         record.employee?.employeeId || "-",
+//       designation:
+//         record.employee?.designation || "-",
+//       checkInTime: record.checkIn,
+//       checkOutTime: record.checkOut,
+//       mode: record.mode || "-",
+//     }));
+
+//     res.status(200).json(response);
+
+//   } catch (err) {
+
+//   console.log(err);
+
+//   res.status(500).json({
+//     message: "Failed to fetch late check-ins",
+//     error: err.message,
+//   });
+// }
+// });
 app.get("/attendance/late-checkins", async (req, res) => {
   try {
 
@@ -322,17 +434,40 @@ const teamEmployeeIds = teams.flatMap(
     });
 
     // Response
-    const response = filtered.map((record) => ({
-      _id: record._id,
-      name: record.employee?.name || "-",
-      employeeId:
-        record.employee?.employeeId || "-",
-      designation:
-        record.employee?.designation || "-",
-      checkInTime: record.checkIn,
-      checkOutTime: record.checkOut,
-      mode: record.mode || "-",
-    }));
+  //   const response = filtered.map((record) => ({
+  //     _id: record._id,
+  //     name: record.employee?.name || "-",
+  //     employeeId:
+  //       record.employee?.employeeId || "-",
+  //     designation:
+  //       record.employee?.designation || "-",
+  //     checkInTime: record.checkIn,
+  //     checkOutTime: record.checkOut,
+  //     mode: record.mode || "-",
+  //       // ✅ Add this
+  // lateCheckInCount: record.lateCheckInCount || 0,
+  //   }));
+  const checkIn = new Date(record.checkIn);
+
+const isLate =
+  checkIn.getHours() > 9 ||
+  (checkIn.getHours() === 9 &&
+    checkIn.getMinutes() > 10);
+
+const response = filtered.map((record) => ({
+  _id: record._id,
+  name: record.employee?.name || "-",
+  employeeId: record.employee?.employeeId || "-",
+  designation: record.employee?.designation || "-",
+  checkInTime: record.checkIn,
+  checkOutTime: record.checkOut,
+  mode: record.mode || "-",
+
+  lateCheckInCount: record.lateCheckInCount || 0,
+
+  // ✅ ADD THIS
+  lateCheckIn: isLate,
+}));
 
     res.status(200).json(response);
 
