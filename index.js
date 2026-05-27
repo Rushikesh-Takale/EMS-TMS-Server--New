@@ -51,7 +51,8 @@ const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const Interview = require("./models/InterviewSchema");
 const resumeUpload = require("./authMiddleware/resumeUpload");
 require("./cron/interviewStatusCron");
-require("./cron/probationReminderCron")
+require("./cron/probationReminderCron");
+require("./cron/monthlyLeaveBalanceCron")
 dotenv.config();
 
 const app = express();
@@ -2124,7 +2125,10 @@ app.get("/attendance/on-leave-employees", authenticate, async (req, res) => {
       "admin",
       "hr",
       "manager",
-      "Team_Leader"
+      "Team_Leader",
+      "md",
+      "ceo",
+      "coo"
     ];
 
     if (!allowedRoles.includes(req.user.role)) {
