@@ -9,7 +9,10 @@ const attendanceSchema = new mongoose.Schema(
     checkIn: { type: Date },
     checkOut: { type: Date },
     workingHours: { type: Number, default: 0 },
-
+lateCheckInCount: {
+  type: Number,
+  default: 0,
+},
   
     regularizationRequest: {
       checkIn: { type: Date },
