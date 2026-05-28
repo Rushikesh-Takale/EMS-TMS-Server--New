@@ -4,6 +4,8 @@ const Leave = require("../models/LeaveSchema");
 const nodemailer = require("nodemailer");
 const monthlyLeaveBalanceTemplate = require("../template/monthlyLeaveBalanceTemplate");
 const adminLeaveSummaryTemplate = require("../template/adminLeaveSummaryTemplate");
+const { initializeWhatsApp, sendWhatsAppMessage, sendWhatsAppFile } = require("../whatsapp/whatsappClient");
+const { formatWhatsAppLeaveBalanceMessage, formatWhatsAppAdminSummaryMessage, generateExcelFile  } = require("../template/whatsappmessformatAdminEmp");
 
 const transporter = nodemailer.createTransport({
   host: "smtpout.secureserver.net",
@@ -17,6 +19,10 @@ const transporter = nodemailer.createTransport({
 
 async function sendMonthlyLeaveBalance() {
   try {
+
+    await initializeWhatsApp();
+    console.log("whatsApp is ready...");
+
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -33,11 +39,24 @@ async function sendMonthlyLeaveBalance() {
       isDeleted: { $ne: true },
       role: { $in: ["coo", "ceo", "hr", "admin"] }
     });
+
+    // const adminUsers = await User.find({ 
+    //   isDeleted: { $ne: true },
+    //   role: "coo"
+    // });
+    
     
     const individualUsers = await User.find({ 
       isDeleted: { $ne: true },
       role: { $in: ["Team_Leader", "employee", "IT_Support", "manager"] }
     });
+
+    // const individualUsers = await User.find({ 
+    //   isDeleted: { $ne: true },
+    //   role: "Team_Leader",
+    //   email: "rutujanagude5@gmail.com"
+    // });
+
     
     console.log(`Found ${adminUsers.length} admin user`);
     console.log(`Found ${individualUsers.length} emp`);
@@ -75,7 +94,8 @@ async function sendMonthlyLeaveBalance() {
           cl: emp.casualLeaveBalance || 0,
           sl: emp.sickLeaveBalance || 0,
           total: (emp.casualLeaveBalance || 0) + (emp.sickLeaveBalance || 0),
-          leavesTaken: leavesTaken
+          leavesTaken: leavesTaken,
+          contact: emp.contact  //for whatsapp message
         });
         
       } catch (err) {
@@ -83,6 +103,10 @@ async function sendMonthlyLeaveBalance() {
       }
     }
     
+    // Generate Excel file
+    const excelBuffer = await generateExcelFile(completeEmployeeData, monthName, year);
+    const excelFilename = `Leave_Balance_Summary_${monthName}_${year}.xlsx`;
+
     for (const admin of adminUsers) {
       try {
         const adminHtml = await adminLeaveSummaryTemplate(monthName, year, completeEmployeeData);
@@ -95,6 +119,20 @@ async function sendMonthlyLeaveBalance() {
         });
         
         console.log(`Summary report sent to ${admin.role}: ${admin.name} (${admin.email}) - Total ${completeEmployeeData.length} employees`);
+
+        //whasapp mess code start
+        if (admin.contact) {
+          const whatsappMessage =  formatWhatsAppAdminSummaryMessage(monthName, year, completeEmployeeData);
+          await sendWhatsAppMessage(admin.contact, whatsappMessage);
+          
+          await sendWhatsAppFile(admin.contact, excelBuffer, excelFilename);
+          
+          console.log(`WhatsApp message sent to : ${admin.name}`);
+        } else {
+          console.log(`No contact number for: ${admin.name}`);
+        }
+        //whatsapp code edn
+
         await new Promise(resolve => setTimeout(resolve, 1000));
         
       } catch (err) {
@@ -137,6 +175,17 @@ async function sendMonthlyLeaveBalance() {
         });
         
         console.log(`leave balance sent to ${emp.role}: ${emp.name} (${emp.email})`);
+
+        // emp whatsapp messag e code start
+        if (emp.contact) {
+          const whatsappMessage = formatWhatsAppLeaveBalanceMessage(emp.name, monthName, year, balances);
+          await sendWhatsAppMessage(emp.contact, whatsappMessage);
+          console.log(`WhatsApp message sent to: ${emp.name}`);
+        } else {
+          console.log(`No contact number for: ${emp.name}`);
+        }
+        // emp whatsapp code end 
+
         await new Promise(resolve => setTimeout(resolve, 1000));
         
       } catch (err) {
@@ -166,5 +215,13 @@ cron.schedule("10 9 28-31 * *", () => {
 }, {
   timezone: "Asia/Kolkata"
 });
+
+
+// cron.schedule("3 15 * * *", async () => {  
+//   console.log("Running monthly leave balance check at:", new Date().toISOString());
+//   await sendMonthlyLeaveBalance();  
+// }, {
+//   timezone: "Asia/Kolkata"
+// });
 
 module.exports = { sendMonthlyLeaveBalance };
