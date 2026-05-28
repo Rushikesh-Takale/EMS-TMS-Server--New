@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const attendanceSchema = new mongoose.Schema(
   {
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+
+
     date: { type: Date, required: true },
 
     checkIn: { type: Date },
@@ -13,7 +15,10 @@ lateCheckInCount: {
   type: Number,
   default: 0,
 },
-  
+  lateCheckIn: {
+  type: Boolean,
+  default: false,
+},
     regularizationRequest: {
       checkIn: { type: Date },
       checkOut: { type: Date },
