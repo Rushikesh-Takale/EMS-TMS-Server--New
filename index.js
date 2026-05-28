@@ -169,8 +169,8 @@ app.get("/attendance/manager-late-checkins", async (req, res) => {
       }
     }
 
-    const attendance = await Attendance.find(query)
-      .populate("employee");
+   const attendance = await Attendance.find(query)
+  .populate("employee");
 
     let filteredAttendance = attendance;
 
@@ -378,8 +378,11 @@ if (from || to) {
   }
 }
 
+    // const attendance = await Attendance.find(query)
+    //   .populate("employee");
     const attendance = await Attendance.find(query)
-      .populate("employee");
+  .populate("employee", "employeeId name designation");
+   
 
     let filteredAttendance = attendance;
 
@@ -448,28 +451,54 @@ const teamEmployeeIds = teams.flatMap(
   //       // ✅ Add this
   // lateCheckInCount: record.lateCheckInCount || 0,
   //   }));
+//   const checkIn = new Date(record.checkIn);
+
+// const isLate =
+//   checkIn.getHours() > 9 ||
+//   (checkIn.getHours() === 9 &&
+//     checkIn.getMinutes() > 10);
+
+// const response = filtered.map((record) => ({
+//   _id: record._id,
+//   name: record.employee?.name || "-",
+//   employeeId: record.employee?.employeeId || "-",
+//   designation: record.employee?.designation || "-",
+//   checkInTime: record.checkIn,
+//   checkOutTime: record.checkOut,
+//   mode: record.mode || "-",
+
+//   lateCheckInCount: record.lateCheckInCount || 0,
+
+//   // ✅ ADD THIS
+//   lateCheckIn: isLate,
+// }));
+
+const response = filtered.map((record) => {
+
   const checkIn = new Date(record.checkIn);
 
-const isLate =
-  checkIn.getHours() > 9 ||
-  (checkIn.getHours() === 9 &&
-    checkIn.getMinutes() > 10);
+  const isLate =
+    checkIn.getHours() > 9 ||
+    (checkIn.getHours() === 9 &&
+      checkIn.getMinutes() > 10);
 
-const response = filtered.map((record) => ({
-  _id: record._id,
-  name: record.employee?.name || "-",
-  employeeId: record.employee?.employeeId || "-",
-  designation: record.employee?.designation || "-",
-  checkInTime: record.checkIn,
-  checkOutTime: record.checkOut,
-  mode: record.mode || "-",
+  return {
+    _id: record._id,
+     employeeId: record.employee?.employeeId || "-",
+    name: record.employee?.name || "-",
+   
+    designation: record.employee?.designation || "-",
+    checkInTime: record.checkIn,
+    checkOutTime: record.checkOut,
+    mode: record.mode || "-",
 
-  lateCheckInCount: record.lateCheckInCount || 0,
+    lateCheckInCount: record.lateCheckInCount || 0,
 
-  // ✅ ADD THIS
-  lateCheckIn: isLate,
-}));
-
+    // ✅ Late flag
+    lateCheckIn: isLate,
+  };
+});
+console.log(response);
     res.status(200).json(response);
 
   } catch (err) {
@@ -2375,39 +2404,122 @@ if (req.query.date) {
     });
   }
 });
+// app.post("/attendance/:id/checkin", authenticate, async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { lat, lng, address, mode = "Office" } = req.body;
+
+    
+
+//     if (!lat || !lng || !address) {
+//       return res.status(400).json({ message: "Location required" });
+//     }
+
+//     const today = getToday();
+
+//     let attendance = await Attendance.findOne({ employee: id, date: today });
+
+//     if (attendance?.checkIn)
+//       return res.status(400).json({ message: "Already checked in" });
+
+//     if (mode === "Office") {
+//       const office = await OfficeLocation.findOne({ name: "Creative Web Solution" });
+//       if (!office)
+//         return res.status(400).json({ message: "Office location not set" });
+
+//       const distance = getDistanceFromLatLonInMeters(
+//         lat,
+//         lng,
+//         office.lat,
+//         office.lng,
+//       );
+//       if (distance > 100)
+//         return res.status(400).json({ message: "You are not in the office" });
+
+//       attendance = attendance || new Attendance({ employee: id, date: today });
+//       attendance.checkInLocation = {
+//         lat: office.lat,
+//         lng: office.lng,
+//         address: office.address,
+//       };
+//     }
+
+//     // For WFH, just store employee location
+//     if (mode === "WFH") {
+//       attendance = attendance || new Attendance({ employee: id, date: today });
+//     }
+
+//     attendance.checkIn = new Date();
+//     attendance.employeeCheckInLocation = { lat, lng, address };
+//     attendance.mode = mode;
+//     attendance.dayStatus = "Present";
+
+//     await attendance.save();
+//     res.json({ message: "Check-in successful", attendance });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ message: err.message });
+//   }
+// });
 app.post("/attendance/:id/checkin", authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const { lat, lng, address, mode = "Office" } = req.body;
 
-    
-
     if (!lat || !lng || !address) {
-      return res.status(400).json({ message: "Location required" });
+      return res.status(400).json({
+        message: "Location required",
+      });
     }
 
     const today = getToday();
 
-    let attendance = await Attendance.findOne({ employee: id, date: today });
+    let attendance = await Attendance.findOne({
+      employee: id,
+      date: today,
+    });
 
-    if (attendance?.checkIn)
-      return res.status(400).json({ message: "Already checked in" });
+    // Already checked in
+    if (attendance?.checkIn) {
+      return res.status(400).json({
+        message: "Already checked in",
+      });
+    }
 
+    // =========================
+    // OFFICE VALIDATION
+    // =========================
     if (mode === "Office") {
-      const office = await OfficeLocation.findOne({ name: "Creative Web Solution" });
-      if (!office)
-        return res.status(400).json({ message: "Office location not set" });
+      const office = await OfficeLocation.findOne({
+        name: "Creative Web Solution",
+      });
+
+      if (!office) {
+        return res.status(400).json({
+          message: "Office location not set",
+        });
+      }
 
       const distance = getDistanceFromLatLonInMeters(
         lat,
         lng,
         office.lat,
-        office.lng,
+        office.lng
       );
-      if (distance > 100)
-        return res.status(400).json({ message: "You are not in the office" });
 
-      attendance = attendance || new Attendance({ employee: id, date: today });
+      if (distance > 100) {
+        return res.status(400).json({
+          message: "You are not in the office",
+        });
+      }
+
+      attendance =
+        attendance ||
+        new Attendance({
+          employee: id,
+          date: today,
+        });
+
       attendance.checkInLocation = {
         lat: office.lat,
         lng: office.lng,
@@ -2415,21 +2527,79 @@ app.post("/attendance/:id/checkin", authenticate, async (req, res) => {
       };
     }
 
-    // For WFH, just store employee location
+    // =========================
+    // WFH
+    // =========================
     if (mode === "WFH") {
-      attendance = attendance || new Attendance({ employee: id, date: today });
+      attendance =
+        attendance ||
+        new Attendance({
+          employee: id,
+          date: today,
+        });
     }
 
-    attendance.checkIn = new Date();
-    attendance.employeeCheckInLocation = { lat, lng, address };
+    // =========================
+    // CHECK-IN TIME
+    // =========================
+    const now = new Date();
+
+    attendance.checkIn = now;
+
+    attendance.employeeCheckInLocation = {
+      lat,
+      lng,
+      address,
+    };
+
     attendance.mode = mode;
+
+    // =========================
+    // LATE CHECK-IN LOGIC
+    // =========================
+    const isLate =
+      now.getHours() > 9 ||
+      (
+        now.getHours() === 9 &&
+        now.getMinutes() > 10
+      );
+
+    attendance.lateCheckIn = isLate;
+
+    // =========================
+    // COUNT PREVIOUS LATES
+    // =========================
+    if (isLate) {
+
+      const previousLateCount =
+        await Attendance.countDocuments({
+          employee: id,
+          lateCheckIn: true,
+          date: { $lt: today },
+        });
+
+      // Today attempt number
+      attendance.lateCheckInCount =
+        previousLateCount + 1;
+    } else {
+      attendance.lateCheckInCount = 0;
+    }
+
     attendance.dayStatus = "Present";
 
     await attendance.save();
-    res.json({ message: "Check-in successful", attendance });
+
+    res.json({
+      message: "Check-in successful",
+      attendance,
+    });
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: err.message });
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
@@ -7068,6 +7238,30 @@ app.get("/attendance/employee/:id", async (req, res) => {
 });
 
 // ✅ Get all attendance records of a particular employee
+// app.get("/attendance/all/:employeeId", async (req, res) => {
+//   try {
+//     const { employeeId } = req.params;
+
+//     // Validate ObjectId
+//     if (!employeeId || !employeeId.match(/^[0-9a-fA-F]{24}$/)) {
+//       return res.status(400).json({ message: "Invalid employee ID" });
+//     }
+
+//     // Fetch records
+//     const records = await Attendance.find({ employee: employeeId })
+//       .populate("employee", "name email department role")
+//       .sort({ date: -1 });
+
+//     if (!records || records.length === 0) {
+//       return res.status(404).json({ message: "No attendance records found" });
+//     }
+
+//     res.status(200).json(records);
+//   } catch (err) {
+//     console.error("Error fetching employee attendance:", err);
+//     res.status(500).json({ message: "Server error", error: err.message });
+//   }
+// });
 app.get("/attendance/all/:employeeId", async (req, res) => {
   try {
     const { employeeId } = req.params;
@@ -7083,13 +7277,45 @@ app.get("/attendance/all/:employeeId", async (req, res) => {
       .sort({ date: -1 });
 
     if (!records || records.length === 0) {
-      return res.status(404).json({ message: "No attendance records found" });
+      return res.status(404).json({
+        message: "No attendance records found",
+      });
     }
 
-    res.status(200).json(records);
+    // ✅ Add lateCheckIn flag
+    const updatedRecords = records.map((record) => {
+      let isLate = false;
+
+      if (record.checkIn) {
+        const checkIn = new Date(record.checkIn);
+
+        isLate =
+          checkIn.getHours() > 9 ||
+          (
+            checkIn.getHours() === 9 &&
+            checkIn.getMinutes() > 10
+          );
+      }
+
+      return {
+        ...record.toObject(),
+
+        lateCheckIn: isLate,
+      };
+    });
+
+    res.status(200).json(updatedRecords);
+
   } catch (err) {
-    console.error("Error fetching employee attendance:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error(
+      "Error fetching employee attendance:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
   }
 });
 
