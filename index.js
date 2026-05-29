@@ -2722,6 +2722,7 @@ app.get("/attendance/today", authenticate, async (req, res) => {
       const att = attendanceMap[emp._id.toString()]; // <-- define att here
       return {
         _id: emp._id,
+         employeeId: emp.employeeId,
         name: emp.name,
         email: emp.email,
         contact: emp.contact,
@@ -7500,10 +7501,10 @@ app.get("/attendance/manager/:managerId/today", async (req, res) => {
       return res.status(400).json({ message: "Invalid manager ID" });
     }
 
-    const employees = await User.find(
-      { reportingManager: managerId },
-      "_id name email department role employeeId reportingManager",
-    );
+   const employees = await User.find(
+  { reportingManager: managerId },
+  "_id name email department designation role employeeId reportingManager",
+);
 
     if (!employees.length) {
       return res.status(200).json({ employees: [] });
@@ -7531,6 +7532,7 @@ app.get("/attendance/manager/:managerId/today", async (req, res) => {
         name: emp.name,
         email: emp.email,
         department: emp.department,
+        designation: emp.designation,
         role: emp.role,
         employeeId: emp.employeeId,
         reportingManager: emp.reportingManager,
