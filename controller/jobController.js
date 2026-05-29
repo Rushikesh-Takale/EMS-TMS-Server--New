@@ -45,9 +45,14 @@ exports.createJob = async (req, res) => {
     const job = await Job.create(req.body);
 
     // added by shivani
+    const creatorId = req.user?._id;
+    
     const notifyUsers = await User.find(
-      { role: { $in: ["employee", "manager", "it"] } },
-      "_id role"
+      { 
+        isDeleted: { $ne: true },
+        _id: { $ne: creatorId }
+      },
+      "_id"
     );
     
     const jobTypeFormatted =
@@ -61,7 +66,7 @@ exports.createJob = async (req, res) => {
       user: user._id,
       type: "Job",
       message: `New ${jobTypeFormatted} job posted: ${job.jobTitle}`,
-      triggeredByRole: "HR", 
+      triggeredByRole: req.user?.role?.toUpperCase() || "HR", 
       jobRef: job._id,
       isRead: false,
       createdAt: new Date(),
@@ -197,6 +202,8 @@ exports.deleteJob = async (req, res) => {
   try {
     const job = await Job.findByIdAndDelete(req.params.id);
     if (!job) return res.status(404).json({ error: "Job not found" });
+
+    await Notification.deleteMany({ jobRef: req.params.id });
 
     res.json({ message: "Job deleted permanently" });
   } catch (err) {

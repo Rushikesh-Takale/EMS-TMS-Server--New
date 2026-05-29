@@ -40,6 +40,7 @@ const notificationSchema = new mongoose.Schema(
     },//rutuja
     holidayRef: { type: mongoose.Schema.Types.ObjectId, ref: "Holiday" }, //added by rutuja
     eventRef: { type: mongoose.Schema.Types.ObjectId, ref: "Event" },
+    jobRef: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
 
     isRead: { type: Boolean, default: false },
   },
