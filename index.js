@@ -12336,12 +12336,15 @@ app.get("/resignation", async (req, res) => {
     res.json(
       resignations.map((r) => ({
         resignationId: r.resignationId,
-        employeeId: r.employee.employeeId,
-        employeeName: r.employee.name,
-        designation: r.employee.designation,
-        department: r.employee.department,
+        employeeId: r.employee?.employeeId,
+        employeeName: r.employee?.name,
+        designation: r.employee?.designation,
+        department: r.employee?.department,
         applyDate: r.applyDate.toISOString().split("T")[0],
-        joiningDate: r.employee.doj.toISOString().split("T")[0],
+        joiningDate: r.employee?.doj
+        ? r.employee.doj.toISOString().split("T")[0]
+        : null,
+
         reportingManager: r.employee.reportingManager
           ? r.employee.reportingManager.name
           : "Not assigned",
