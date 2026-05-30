@@ -5742,46 +5742,6 @@ else {
   await leave.save();
 }
 
-// // find nearby leaves
-// const nearbyLeaves = await Leave.find({
-//   employee: employeeId,
-//   status: { $in: ["pending", "approved"] }
-// }).sort({ dateFrom: 1 });
-    // ============================
-    // :bell: NOTIFICATIONS
-    // ============================
-    // await Notification.create({
-    //   user: employee._id,
-    //   type: "Leave",
-    //   message: `Your leave request (${new Date(
-    //     leave.dateFrom
-    //   ).toDateString()} - ${new Date(
-    //     leave.dateTo
-    //   ).toDateString()}) has been ${status}.`,
-    //   leaveRef: leave._id,
-    //   triggeredBy: userId,
-    //   triggeredByRole: role,
-    // });
-
-    // const admins = await User.find({
-    //   role: { $in: ["admin", "hr", "ceo"] },
-    // });
-
-    // for (let admin of admins) {
-    //   await Notification.create({
-    //     user: admin._id,
-    //     type: "Leave",
-    //     message: `${employee.name}'s leave request (${new Date(
-    //       leave.dateFrom
-    //     ).toDateString()} - ${new Date(
-    //       leave.dateTo
-    //     ).toDateString()}) has been ${status} by ${role}.`,
-    //     leaveRef: leave._id,
-    //     triggeredBy: userId,
-    //     triggeredByRole: role,
-    //   });
-    // }
-
     // ========== SEND EMAIL TO EMPLOYEE ==========
     const approver = await User.findById(userId).select("role name");
 const actualRole = approver ? approver.role : role;
@@ -10518,7 +10478,7 @@ app.post("/policy/create", upload.single("pdf"), async (req, res) => {
     const savedPolicy = await policy.save();
     // added by shivani
 
-    const allowedRoles = ["employee", "IT_Support", "ceo", "md","Team_Leader"];
+    const allowedRoles = ["employee", "IT_Support", "ceo", "md","Team_Leader","manager","coo"];
 
     const users = await User.find({ role: { $in: allowedRoles } }).select("_id");
 
@@ -10618,6 +10578,8 @@ app.delete("/policy/delete/:id", async (req, res) => {
         message: "Policy not found",
       });
     }
+
+    await Notification.deleteMany({ announcementRef: id });
 
     res.status(200).json({
       success: true,
