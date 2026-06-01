@@ -31,6 +31,7 @@ const probationReminderTemplate = async (employees) => {
         <td style="padding: 10px; border: 1px solid #ddd;">${emp.designation || 'N/A'}</td>
         <td style="padding: 10px; border: 1px solid #ddd;">${formattedDoj}</td>
         <td style="padding: 10px; border: 1px solid #ddd;">${formattedEndDate}</td>
+        <td style="padding: 10px; border: 1px solid #ddd;">${emp.remainingDays} days</td>
       </tr>
     `;
   }).join('');
@@ -72,6 +73,12 @@ const probationReminderTemplate = async (employees) => {
             This is to notify you that the following <strong>${employees.length} employee(s)</strong> have their probation period ending within the next month:
             </p>
 
+            <div>
+              <strong>Summary:</strong><br/>
+              ${employees.filter(e => e.remainingDays === 30).length} employee(s) have 30 days remaining<br/>
+              ${employees.filter(e => e.remainingDays === 15).length} employee(s) have 15 days remaining 
+            </div>
+
             <div style="overflow-x: auto;">
               <table style="width: 100%; 
                     border-collapse: collapse; 
@@ -86,6 +93,7 @@ const probationReminderTemplate = async (employees) => {
                     <th style="padding: 10px; border: 1px solid #ddd;">Designation</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Date of Joining</th>
                     <th style="padding: 10px; border: 1px solid #ddd;">Probation End Date</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Days Remaining</th>
                   </tr>
                 </thead>
                 <tbody>
