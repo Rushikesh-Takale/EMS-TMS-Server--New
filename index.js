@@ -12345,8 +12345,8 @@ app.get("/resignation", async (req, res) => {
         ? r.employee.doj.toISOString().split("T")[0]
         : null,
 
-        reportingManager: r.employee.reportingManager
-          ? r.employee.reportingManager.name
+        reportingManager: r.employee?.reportingManager
+          ? r.employee?.reportingManager.name
           : "Not assigned",
         reason: r.reason,
         comments: r.comments || "",
