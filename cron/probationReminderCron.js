@@ -52,11 +52,9 @@ async function checkProbationReminders() {
       
       const daysRemaining = Math.ceil((probationEndDate - today) / (1000 * 60 * 60 * 24));
       
-      // Check if exactly 30 days OR exactly 15 days remaining
       if (daysRemaining === 30 || daysRemaining === 15) {
         const reminderKey = `${employee._id}_${daysRemaining}days`;
         
-        // Send only if not already sent
         if (!sentReminders.has(reminderKey)) {
           employeesForReminder.push({
             name: employee.name,
