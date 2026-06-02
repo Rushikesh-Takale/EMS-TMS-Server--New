@@ -84,6 +84,7 @@ app.use("/uploads", express.static("uploads"));
 const allowedOrigins = [
   "https://www.creativewebsolution.life",
   "http://localhost:5173",
+  "https://ems-tms-client-new.vercel.app",
 ];
 
 app.use((req, res, next) => {
